@@ -1,7 +1,9 @@
 language: go
 go:
   - 1.8.3
-  - dev
+branches:
+  only:
+    - dev
 
 install:
-  - go get -t -v ./...
+  - go get -t -v ./..
