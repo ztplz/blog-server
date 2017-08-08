@@ -1,0 +1,14 @@
+language: go
+
+go:
+  - 1.8.3
+
+branches:
+  only:
+    - dev
+
+notifications:
+  email: true
+
+install:
+  - go get -t -v ./..
