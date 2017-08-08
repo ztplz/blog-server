@@ -9,6 +9,3 @@ branches:
 
 notifications:
   email: true
-
-install:
-  - go get -t -v ./..
