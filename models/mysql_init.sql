@@ -11,9 +11,10 @@ CREATE TABLE IF NOT EXISTS `admin` (
   `admin_id`   varchar(255)     NOT NULL DEFAULT '',
   `password`   varchar(255)     NOT NULL DEFAULT '',
   `admin_name` varchar(255)     NOT NULL DEFAULT '',
-  `email` varchar(255) NOT NULL DEFAULT '',
+  -- `email` varchar(255) NOT NULL DEFAULT '',
   `image` varchar(255) NOT NULL DEFAULT '',
-  `token` varchar(255) NOT NULL DEFAULT '',
+  `last_login_at` varchar(255) NOT NULL DEFAULT '',
+  -- `token` varchar(255) NOT NULL DEFAULT '',
   primary key (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
