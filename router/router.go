@@ -34,6 +34,7 @@ func InitialRouter() {
 		category.GET("", controllers.GetAllCategoryHandler)
 		category.POST("", controllers.AddCategory)
 		category.DELETE("", controllers.DeleteCategoryHandler)
+		category.PUT("/:name", controllers.UpdateCategoryHandler)
 	}
 
 	r.Run(":8080")

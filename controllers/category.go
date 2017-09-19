@@ -122,3 +122,62 @@ func DeleteCategoryHandler(c *gin.Context) {
 		"message": "success",
 	})
 }
+
+// 修改某个分类名
+func UpdateCategoryHandler(c *gin.Context) {
+	_, err := middlewares.AdminAuthMiddleware(c)
+
+	if err != nil {
+		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
+		c.JSON(401, gin.H{
+			"message": err.Error(),
+		})
+		c.AbortWithError(401, errors.New("auth failed"))
+
+		return
+	}
+
+	// 要修改的分类名
+	category := c.Param("name")
+	// 替换原来的分类名
+	key := c.Query("category")
+
+	err = models.UpdateCategory(category, key)
+	if err != nil {
+		log.Println(err)
+		c.JSON(500, gin.H{
+			"message": "failed",
+		})
+		c.AbortWithError(401, errors.New("update failed"))
+	}
+
+	c.JSON(200, gin.H{
+		"message": "update success",
+	})
+
+	// err = c.ShouldBindWith(&categoryVals, binding.JSON)
+	// if err != nil {
+	// 	log.Println(err)
+	// 	c.JSON(400, gin.H{
+	// 		"message": "Miss category field",
+	// 	})
+	// 	c.AbortWithError(400, errors.New("Miss category field"))
+
+	// 	return
+	// }
+
+	// err = models.DeleteCategory(categoryVals.Category)
+	// log.Println(err)
+	// if err != nil {
+	// 	c.JSON(500, gin.H{
+	// 		"message": "failed",
+	// 	})
+	// 	c.AbortWithError(400, errors.New("failed"))
+
+	// 	return
+	// }
+
+	// c.JSON(200, gin.H{
+	// 	"message": "success",
+	// })
+}

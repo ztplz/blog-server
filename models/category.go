@@ -15,6 +15,7 @@ const (
 	qAddCategory    = "INSERT INTO category_list (category) VALUES (?)"
 	qGetAllCategory = "SELECT category FROM category_list"
 	qDeleteCategory = "DELETE FROM category_list WHERE category = ?"
+	qUpdateCategory = "UPDATE category_list SET category = ? WHERE category = ?"
 )
 
 // 增加分类名
@@ -80,4 +81,32 @@ func DeleteCategory(category string) error {
 	}
 
 	return nil
+}
+
+// 修改某个分类名
+func UpdateCategory(category string, key string) error {
+	stmt, err := DB.Prepare(qUpdateCategory)
+	defer stmt.Close()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	res, err := stmt.Exec(key, category)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	if rows == 0 {
+		return errors.New("No Category Update")
+	}
+
+	return nil
+
 }
