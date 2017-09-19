@@ -6,13 +6,13 @@ import (
 )
 
 // just for test token auth
-func helloHandler(c *gin.Context) {
-	claims := controllers.ExtractClaims(c)
-	c.JSON(200, gin.H{
-		"userID": claims["id"],
-		"text":   "Hello World.",
-	})
-}
+// func helloHandler(c *gin.Context) {
+// 	claims := controllers.ExtractClaims(c)
+// 	c.JSON(200, gin.H{
+// 		"userID": claims["id"],
+// 		"text":   "Hello World.",
+// 	})
+// }
 
 // 初始化路由
 func InitialRouter() {
@@ -22,10 +22,18 @@ func InitialRouter() {
 	r.POST("/api/v1/admin/login", controllers.AdminLoginHandler)
 
 	// 管理员权限
-	authAdmin := r.Group("/api/v1/admin")
-	authAdmin.Use(controllers.AdminAuthMiddleware)
+	admin := r.Group("/api/v1/admin")
 	{
-		authAdmin.GET("/hello", helloHandler)
+		admin.GET("", controllers.GetAdminInfo)
+		admin.POST("", controllers.AdminLoginHandler)
+	}
+
+	// 分类名操作
+	category := r.Group("/api/v1/category")
+	{
+		category.GET("", controllers.GetAllCategoryHandler)
+		category.POST("", controllers.AddCategory)
+		category.DELETE("", controllers.DeleteCategoryHandler)
 	}
 
 	r.Run(":8080")

@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -9,9 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/ztplz/blog-server/middlewares"
 	"github.com/ztplz/blog-server/models"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -20,7 +20,7 @@ import (
 var SigningAlgorithm = "HS256"
 
 // secret key
-var secretKey = []byte("golangblog")
+var secretKey = []byte("adminblog")
 
 // token持续时间, 设置为一周
 var Timeout = time.Hour * 24 * 7
@@ -39,7 +39,12 @@ func AdminLoginHandler(c *gin.Context) {
 
 	// 判断是否有密码字段
 	if c.ShouldBindWith(&loginVals, binding.JSON) != nil {
-		unauthorized(c, http.StatusBadRequest, "Miss AdminID Or Password")
+		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
+		c.JSON(400, gin.H{
+			"message": "Miss AdminID Or Password",
+		})
+		c.AbortWithError(400, errors.New("Miss AdminID Or Password"))
+
 		return
 	}
 
@@ -47,11 +52,11 @@ func AdminLoginHandler(c *gin.Context) {
 	log.Println(loginVals.Password)
 
 	// 管理员账号，密码两边除去换行符和空格
-	adminId := strings.TrimSpace(loginVals.AdminID)
+	adminID := strings.TrimSpace(loginVals.AdminID)
 	password := strings.TrimSpace(loginVals.Password)
 
 	// 判断管理员账号，密码是否由数字和字母组成
-	a, _ := regexp.MatchString("^[A-Za-z0-9]+$", adminId)
+	a, _ := regexp.MatchString("^[A-Za-z0-9]+$", adminID)
 	b, _ := regexp.MatchString("^[A-Za-z0-9]+$", password)
 	if !a || !b {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -63,7 +68,7 @@ func AdminLoginHandler(c *gin.Context) {
 	}
 
 	// 判断管理员账户是否符合规定长度
-	if len(adminId) < models.AdminIDLengthMin || len(adminId) > models.AdminIDLengthMax {
+	if len(adminID) < models.AdminIDLengthMin || len(adminID) > models.AdminIDLengthMax {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Incorrect AdminID Length",
 		})
@@ -83,25 +88,24 @@ func AdminLoginHandler(c *gin.Context) {
 	}
 
 	// 从数据库查询密码
-	admin, err := models.AdminByAdminID(loginVals.AdminID)
+	admin, err := models.AdminByID(1)
 
 	// 数据查询失败
 	if err != nil {
-		// 管理员ID不存在
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": "AdminID Not Exist",
-			})
-			c.AbortWithError(http.StatusInternalServerError, errors.New("AdminID Not Exist"))
-
-			return
-		}
-
-		// 数据查询错误
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": http.StatusText(http.StatusInternalServerError),
 		})
 		c.AbortWithError(http.StatusInternalServerError, errors.New("Admin Data Query Fail"))
+
+		return
+	}
+
+	// 管理员ID不存在
+	if admin.AdminID != adminID {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "AdminID Not Exist",
+		})
+		c.AbortWithError(http.StatusInternalServerError, errors.New("AdminID Not Exist"))
 
 		return
 	}
@@ -134,7 +138,7 @@ func AdminLoginHandler(c *gin.Context) {
 	// 生成token失败
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": http.StatusText(http.StatusInternalServerError),
+			"message": "request token failed",
 		})
 		c.AbortWithError(http.StatusInternalServerError, errors.New("Create JWT Token faild"))
 
@@ -150,11 +154,38 @@ func AdminLoginHandler(c *gin.Context) {
 
 	// 记录成功登录时间
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
-	log.Printf("管理员 %s 登录成功    s%", loginVals.AdminID, currentTime)
+	log.Printf("管理员 %s 登录成功    %s", loginVals.AdminID, currentTime)
 	err = models.UpdateAdminLoginTime(currentTime)
 	if err != nil {
-		log.Printf("存储管理员登录时间 s% 失败", currentTime)
+		log.Printf("存储管理员登录时间 %s 失败", currentTime)
 	}
+}
+
+// 获取管理员信息
+func GetAdminInfo(c *gin.Context) {
+	// token 认证
+	admin, err := middlewares.AdminAuthMiddleware(c)
+	if err != nil {
+		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
+		c.JSON(401, gin.H{
+			"message": err.Error(),
+		})
+		c.AbortWithError(401, errors.New("auth failed"))
+
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"admin_name":    admin.AdminName,
+		"image":         admin.Image,
+		"last_login_in": admin.LastLoginAt,
+	})
+
+}
+
+// 管理员退出登录
+func AdminLogOut(c *gin.Context) {
+
 }
 
 // 后台token认证中间件

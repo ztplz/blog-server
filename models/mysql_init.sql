@@ -18,6 +18,14 @@ CREATE TABLE IF NOT EXISTS `admin` (
   primary key (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+# 如果表 category 不存在就奖励一个叫 categorya 的表
+CREATE TABLE IF NOT EXISTS `category_list` (
+  `id`         INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `category`   varchar(255)     NOT NULL DEFAULT '',
+  primary key (id)        
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
 # INSERT INTO `admin` SET admin_id='admin', password='$2a$10$uIBcwGWH.hwsilRGd34HHOTOmzbiWUD4buHziGK59TDxJNXSv26cW', admin_name='admin';
 
 # CREATE TABLE `userinfo` (
