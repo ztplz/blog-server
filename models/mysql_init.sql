@@ -18,10 +18,18 @@ CREATE TABLE IF NOT EXISTS `admin` (
   primary key (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-# 如果表 category 不存在就奖励一个叫 categorya 的表
+# 如果表 category_list 不存在就奖励一个叫 category_list 的表
 CREATE TABLE IF NOT EXISTS `category_list` (
   `id`         INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
   `category`   varchar(255)     NOT NULL DEFAULT '',
+  primary key (id)        
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+# 如果表 tag 不存在就奖励一个叫 tag 的表
+CREATE TABLE IF NOT EXISTS `tag` (
+  `id`          INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `color`       varchar(255)     NOT NULL DEFAULT '',
+  `tag_title`   varchar(255)     NOT NULL DEFAULT '',
   primary key (id)        
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

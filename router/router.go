@@ -37,5 +37,12 @@ func InitialRouter() {
 		category.PUT("/:name", controllers.UpdateCategoryHandler)
 	}
 
+	// 标签操作
+	tag := r.Group("/api/v1/tag")
+	{
+		tag.GET("", controllers.GetAllTagHandler)
+		tag.POST("", controllers.AddTagHandler)
+	}
+
 	r.Run(":8080")
 }

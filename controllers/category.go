@@ -138,7 +138,7 @@ func UpdateCategoryHandler(c *gin.Context) {
 	}
 
 	// 要修改的分类名
-	category := c.Param("name")
+	category := c.Query("name")
 	// 替换原来的分类名
 	key := c.Query("category")
 
@@ -149,6 +149,8 @@ func UpdateCategoryHandler(c *gin.Context) {
 			"message": "failed",
 		})
 		c.AbortWithError(401, errors.New("update failed"))
+
+		return
 	}
 
 	c.JSON(200, gin.H{
