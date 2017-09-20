@@ -11,6 +11,7 @@ type Tag struct {
 	TagTitle string `db:"tag_title" json:"tag_title"`
 }
 
+// sql 查询语句
 const (
 	qGetAllTag = "SELECT * FROM tag"
 	qAddTag    = "INSERT INTO tag (color, tag_title) VALUES (?, ?)"
