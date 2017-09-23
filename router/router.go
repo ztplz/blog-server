@@ -1,31 +1,40 @@
+/*
+* blog 路由
+*
+* author: ztplz
+* email: mysticzt@gmail.com
+* github: https://github.com/ztplz
+* create-at: 2017.08.15
+ */
+
 package router
 
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/ztplz/blog-server/controllers"
+	"github.com/ztplz/blog-server/middlewares"
 )
 
-// just for test token auth
-// func helloHandler(c *gin.Context) {
-// 	claims := controllers.ExtractClaims(c)
-// 	c.JSON(200, gin.H{
-// 		"userID": claims["id"],
-// 		"text":   "Hello World.",
-// 	})
-// }
-
-// 初始化路由
+// InitialRouter  初始化路由
 func InitialRouter() {
 	r := gin.Default()
 
-	// 后台管理登录
-	r.POST("/api/v1/admin/login", controllers.AdminLoginHandler)
+	r.Use(middlewares.CORSMiddleware())
 
 	// 管理员权限
 	admin := r.Group("/api/v1/admin")
 	{
+		// 获取管理员信息，需鉴定token
 		admin.GET("", controllers.GetAdminInfo)
+
+		// 后台登录
 		admin.POST("", controllers.AdminLoginHandler)
+	}
+
+	// 博文操作
+	article := r.Group("/api/v1/article")
+	{
+		article.POST("", controllers.AddArticleHandler)
 	}
 
 	// 分类名操作
@@ -44,5 +53,6 @@ func InitialRouter() {
 		tag.POST("", controllers.AddTagHandler)
 	}
 
+	// 监听8080端口
 	r.Run(":8080")
 }

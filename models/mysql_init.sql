@@ -11,10 +11,25 @@ CREATE TABLE IF NOT EXISTS `admin` (
   `admin_id`   varchar(255)     NOT NULL DEFAULT '',
   `password`   varchar(255)     NOT NULL DEFAULT '',
   `admin_name` varchar(255)     NOT NULL DEFAULT '',
-  -- `email` varchar(255) NOT NULL DEFAULT '',
   `image` varchar(255) NOT NULL DEFAULT '',
   `last_login_at` varchar(255) NOT NULL DEFAULT '',
-  -- `token` varchar(255) NOT NULL DEFAULT '',
+  `ip` varchar(255) NOT NULL DEFAULT '',
+  primary key (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+# 如果表 article 不存在就建立一个叫 article 的表
+CREATE TABLE IF NOT EXISTS `article` (
+  `id`                  INT(11) UNSIGNED        NOT NULL AUTO_INCREMENT,
+  `create_at`           datetime                NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_at`           datetime                NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `visit_count`         INT(11) UNSIGNED        NOT NULL DEFAULT 0,
+  `reply_count`         INT(11) UNSIGNED        NOT NULL DEFAULT 0,
+  `article_title`       varchar(255)            NOT NULL DEFAULT '',
+  `article_previewtext` varchar(255)            NOT NULL DEFAULT '',
+  `article_content`     varchar(255)            NOT NULL DEFAULT '',
+  `top`                 TINYINT(1)              NOT NULL DEFAULT 0,
+  `category`            varchar(255)            NOT NULL DEFAULT '',
+  `tag_list`            varchar(255)            NOT NULL DEFAULT '',
   primary key (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -25,11 +40,12 @@ CREATE TABLE IF NOT EXISTS `category_list` (
   primary key (id)        
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-# 如果表 tag 不存在就奖励一个叫 tag 的表
-CREATE TABLE IF NOT EXISTS `tag` (
-  `id`          INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
-  `color`       varchar(255)     NOT NULL DEFAULT '',
-  `tag_title`   varchar(255)     NOT NULL DEFAULT '',
+# 如果表 tags 不存在就奖励一个叫 tags 的表
+CREATE TABLE IF NOT EXISTS `tags` (
+  `id`              INT(11) UNSIGNED    NOT NULL AUTO_INCREMENT,
+  `color`           varchar(255)        NOT NULL DEFAULT '',
+  `tag_title`       varchar(255)        NOT NULL DEFAULT '',
+  `article_id`      INT(11) UNSIGNED    NOT NULL DEFAULT 0,
   primary key (id)        
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

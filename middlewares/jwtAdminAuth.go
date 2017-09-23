@@ -1,23 +1,25 @@
 package middlewares
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
+	// "github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/ztplz/blog-server/models"
 )
 
-// token加密算法
+// SigningAlgorithm token加密算法
 var SigningAlgorithm = "HS256"
 
 // secret key
 var secretKey = []byte("adminblog")
 
-// token持续时间, 设置为一周
+// Timeout token持续时间, 设置为一周
 var Timeout = time.Hour * 24 * 7
 
 type AdminLogin struct {
@@ -25,15 +27,24 @@ type AdminLogin struct {
 	Password string `form:"password" json:"password" binding:"required"`
 }
 
-// 后台token认证中间件
+// AdminAuthMiddleware 后台token认证中间件
 func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
 	token, err := parseToken(c)
 
 	// 如果解析 token 发生错误
 	if err != nil {
+		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message":    err.Error(),
+			"statusCode": http.StatusUnauthorized,
+		})
+		c.AbortWithStatus(http.StatusUnauthorized)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusUnauthorized,
+		}).Info("Admin auth failed")
+
 		return nil, err
-		// unauthorized(c, http.StatusUnauthorized, err.Error())
-		// return
 	}
 
 	claims := token.Claims.(jwt.MapClaims)
@@ -43,29 +54,46 @@ func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
 	c.Set("AdminID", id)
 
 	// 从数据取出管理员 ID
-	admin, err := models.AdminByID(1)
+	admin, err := models.AdminByID()
 	if err != nil {
+		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": http.StatusText(http.StatusInternalServerError),
+			"message":    http.StatusText(http.StatusInternalServerError),
+			"statusCode": http.StatusInternalServerError,
 		})
-		c.AbortWithError(http.StatusInternalServerError, errors.New("Query AdminID Faild"))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   "admin info query failed",
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Admin auth failed")
 
 		return nil, err
 	}
 
 	if id != admin.AdminID {
-		unauthorized(c, http.StatusForbidden, "You don't have permission to access.")
-		return nil, errors.New("AdminID Do Not Match")
+		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message":    "You don't have permission to access",
+			"statusCode": http.StatusUnauthorized,
+		})
+		c.AbortWithStatus(http.StatusUnauthorized)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Id don't match adminID",
+			"statusCode": http.StatusUnauthorized,
+		}).Info("Admin auth failed")
+
+		return nil, errors.New("Incorrect token")
 	}
 
 	return admin, nil
 }
 
-// 提取 JWT claims
+// ExtractClaims 提取 JWT claims
 func ExtractClaims(c *gin.Context) jwt.MapClaims {
-
-	if _, exists := c.Get("JWT_PAYLOAD"); !exists {
+	_, exists := c.Get("JWT_PAYLOAD")
+	if !exists {
 		emptyClaims := make(jwt.MapClaims)
+
 		return emptyClaims
 	}
 
@@ -88,8 +116,8 @@ func parseToken(c *gin.Context) (*jwt.Token, error) {
 
 	return jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 		if jwt.GetSigningMethod(SigningAlgorithm) != token.Method {
-			cause := errors.New("Invalid Signing Algorithm")
-			err := errors.WithMessage(cause, "Auth Failed")
+			err := errors.New("Invalid signing algorithm")
+
 			return nil, err
 		}
 
@@ -103,8 +131,8 @@ func jwtFromHeader(c *gin.Context, key string) (string, error) {
 
 	// 如果请求头 Authorization 部分为空
 	if authHeader == "" {
-		cause := errors.New("Auth Header Empty")
-		err := errors.WithMessage(cause, "Auth Failed")
+		err := errors.New("Auth header empty")
+
 		return "", err
 	}
 
@@ -112,20 +140,10 @@ func jwtFromHeader(c *gin.Context, key string) (string, error) {
 	parts := strings.SplitN(authHeader, " ", 2)
 
 	if !(len(parts) == 2 && parts[0] == "Bearer") {
-		cause := errors.New("Invalid Auth Header")
-		err := errors.WithMessage(cause, "Auth Failed")
+		err := errors.New("Invalid auth header")
+
 		return "", err
 	}
 
 	return parts[1], nil
-}
-
-func unauthorized(c *gin.Context, code int, message string) {
-	c.Header("WWW-Authenticate", "JWT realm=gin jwt")
-	c.JSON(code, gin.H{
-		"message": message,
-	})
-	c.AbortWithError(code, errors.New(message))
-
-	return
 }

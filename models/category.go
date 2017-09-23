@@ -2,13 +2,14 @@ package models
 
 import (
 	"errors"
-	"log"
+
+	log "github.com/sirupsen/logrus"
 )
 
-// 文章的数据结构
+// Category 文章的数据结构
 type Category struct {
 	ID       uint   `db:"id" json:"id"`
-	category string `db:"category" json:"category"`
+	Category string `db:"category" json:"category"`
 }
 
 const (
@@ -18,15 +19,24 @@ const (
 	qUpdateCategory = "UPDATE category_list SET category = ? WHERE category = ?"
 )
 
-// 增加分类名
+// AddCategory 增加分类名
 func AddCategory(category string) error {
 	stmt, err := DB.Prepare(qAddCategory)
-	defer stmt.Close()
 	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql prepare failed")
+
 		return err
 	}
+	defer stmt.Close()
+
 	_, err = stmt.Exec(category)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql Exec failed")
+
 		return err
 	}
 
