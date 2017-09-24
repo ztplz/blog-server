@@ -35,20 +35,21 @@ func AdminLoginHandler(c *gin.Context) {
 	var loginVals AdminLoginForm
 
 	// 判断是否有密码字段
-	if c.ShouldBindWith(&loginVals, binding.JSON) != nil {
+	err := c.ShouldBindWith(&loginVals, binding.JSON)
+	if err != nil {
 		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":    "Miss adminID or password",
 			"statusCode": http.StatusBadRequest,
+			"message":    "Miss adminID or password",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 
 		// 记录ip地址
 		ip := c.ClientIP()
 		log.WithFields(log.Fields{
-			"errorMsg":   "Miss adminID or password",
-			"statusCode": http.StatusBadRequest,
+			"errorMsg":   err,
 			"loginIp":    ip,
+			"statusCode": http.StatusBadRequest,
 		}).Info("Admin login failed")
 
 		return
@@ -63,8 +64,8 @@ func AdminLoginHandler(c *gin.Context) {
 	b, _ := regexp.MatchString("^[A-Za-z0-9]+$", password)
 	if !a || !b {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":    "Incorrect format",
 			"statusCode": http.StatusBadRequest,
+			"message":    "Incorrect format",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
@@ -78,8 +79,8 @@ func AdminLoginHandler(c *gin.Context) {
 	// 判断管理员账户是否符合规定长度
 	if len(adminID) < models.AdminIDLengthMin || len(adminID) > models.AdminIDLengthMax {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":    "Incorrect adminID Length",
 			"statusCode": http.StatusBadRequest,
+			"message":    "Incorrect adminID Length",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
@@ -93,8 +94,8 @@ func AdminLoginHandler(c *gin.Context) {
 	// 判断密码是否符合规定长度
 	if len(password) < models.AdminPasswordLengthMin || len(password) > models.AdminPasswordLengthMax {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":    "Incorrect password length",
 			"statusCode": http.StatusBadRequest,
+			"message":    "Incorrect password length",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
@@ -111,8 +112,8 @@ func AdminLoginHandler(c *gin.Context) {
 	// 数据查询失败
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message":    http.StatusText(http.StatusInternalServerError),
 			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
 		})
 		c.AbortWithStatus(http.StatusInternalServerError)
 		log.WithFields(log.Fields{
@@ -126,8 +127,8 @@ func AdminLoginHandler(c *gin.Context) {
 	// 管理员ID不存在
 	if admin.AdminID != adminID {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":    "AdminID not exist",
 			"statusCode": http.StatusBadRequest,
+			"message":    "AdminID not exist",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 
@@ -146,8 +147,8 @@ func AdminLoginHandler(c *gin.Context) {
 	err = bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(password))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":    "Incorrect admin password",
 			"statusCode": http.StatusBadRequest,
+			"message":    "Incorrect admin password",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 
@@ -155,8 +156,8 @@ func AdminLoginHandler(c *gin.Context) {
 		ip := c.ClientIP()
 		log.WithFields(log.Fields{
 			"errorMsg":   "Incorrect admin password",
-			"statusCode": http.StatusBadRequest,
 			"ip":         ip,
+			"statusCode": http.StatusBadRequest,
 		}).Info("Admin login failed")
 
 		return
@@ -178,8 +179,8 @@ func AdminLoginHandler(c *gin.Context) {
 	// 生成token失败
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message":    "Generate token failed",
 			"statusCode": http.StatusInternalServerError,
+			"message":    "Generate token failed",
 		})
 		c.AbortWithStatus(http.StatusInternalServerError)
 		log.WithFields(log.Fields{

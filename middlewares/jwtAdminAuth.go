@@ -35,8 +35,8 @@ func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
 	if err != nil {
 		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"message":    err.Error(),
 			"statusCode": http.StatusUnauthorized,
+			"message":    err.Error(),
 		})
 		c.AbortWithStatus(http.StatusUnauthorized)
 		log.WithFields(log.Fields{
@@ -58,8 +58,8 @@ func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
 	if err != nil {
 		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message":    http.StatusText(http.StatusInternalServerError),
 			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
 		})
 		c.AbortWithStatus(http.StatusInternalServerError)
 		log.WithFields(log.Fields{
@@ -73,8 +73,8 @@ func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
 	if id != admin.AdminID {
 		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"message":    "You don't have permission to access",
 			"statusCode": http.StatusUnauthorized,
+			"message":    "You don't have permission to access",
 		})
 		c.AbortWithStatus(http.StatusUnauthorized)
 		log.WithFields(log.Fields{
