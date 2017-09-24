@@ -13,14 +13,14 @@ import (
 
 // CategoryForm 增加分类名表单结构
 type CategoryForm struct {
-	Category string
+	Category string `form:"category" json:"category" binding:"required"`
 }
 
 // 获取全部分类名的数据结构
 // type Categories []string
 
-// AddCategory 新增一个分类名
-func AddCategory(c *gin.Context) {
+// AddCategoryHandler 新增一个分类名
+func AddCategoryHandler(c *gin.Context) {
 	var categoryVals CategoryForm
 
 	_, err := middlewares.AdminAuthMiddleware(c)
@@ -32,8 +32,8 @@ func AddCategory(c *gin.Context) {
 	err = c.ShouldBindWith(&categoryVals, binding.JSON)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":    err.Error(),
 			"statusCode": http.StatusBadRequest,
+			"message":    "Miss category",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
@@ -48,8 +48,8 @@ func AddCategory(c *gin.Context) {
 	err = models.AddCategory(categoryVals.Category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message":    http.StatusText(http.StatusInternalServerError),
 			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
 		})
 		c.AbortWithStatus(http.StatusInternalServerError)
 		log.WithFields(log.Fields{
@@ -61,7 +61,8 @@ func AddCategory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "success",
+		"statusCode": http.StatusOK,
+		"message":    "success",
 	})
 
 	// 打印成功增加分类名的日志
@@ -72,27 +73,35 @@ func AddCategory(c *gin.Context) {
 	}).Info("Add category success")
 }
 
-// 获取全部分类名
+// GetAllCategoryHandler 获取全部分类名或者分类名包含的博文
 func GetAllCategoryHandler(c *gin.Context) {
 	categories, err := models.GetAllCategory()
 	if err != nil {
-		log.Println(err)
 		c.JSON(500, gin.H{
-			"message": "query failed",
+			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
 		})
-		c.AbortWithError(401, errors.New("query failed"))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"message":    "Query categories failed",
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Get all categories failed")
 
 		return
 	}
 
-	log.Println(categories)
-
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
 		"categories": categories,
 	})
+
+	log.WithFields(log.Fields{
+		"categories": categories,
+		"statusCode": http.StatusOK,
+	}).Info("Get all categories success")
 }
 
-// 删除某个分类名
+// DeleteCategoryHandler 删除某个分类名
 func DeleteCategoryHandler(c *gin.Context) {
 	var categoryVals CategoryForm
 

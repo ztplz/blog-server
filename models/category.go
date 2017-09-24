@@ -25,6 +25,7 @@ func AddCategory(category string) error {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
+			"category": category,
 		}).Info("Sql prepare failed")
 
 		return err
@@ -35,6 +36,7 @@ func AddCategory(category string) error {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
+			"category": category,
 		}).Info("Sql Exec failed")
 
 		return err
@@ -43,26 +45,31 @@ func AddCategory(category string) error {
 	return nil
 }
 
-// 获取全部分类名
+// GetAllCategory 获取全部分类名
 func GetAllCategory() ([]string, error) {
 	categories := make([]string, 0)
 	rows, err := DB.Query(qGetAllCategory)
-	defer rows.Close()
 	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("DB query all category failed")
+
 		return nil, err
 	}
+	defer rows.Close()
+
 	for rows.Next() {
 		var category string
 		err = rows.Scan(&category)
-		log.Println(category)
 		categories = append(categories, category)
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Rows scan failed")
 	}
 
-	log.Println(categories)
 	return categories, err
 }
 

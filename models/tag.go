@@ -15,7 +15,7 @@ type Tag struct {
 // sql 查询语句
 const (
 	qGetAllTag = "SELECT id, color, tag_title FROM tags"
-	qAddTag    = "INSERT INTO tag (color, tag_title) VALUES (?, ?)"
+	qAddTag    = "INSERT INTO tags (color, tag_title) VALUES (?, ?)"
 )
 
 // GetAllTag 获取全部标签
@@ -78,7 +78,7 @@ func AddTag(color string, title string) error {
 			"errorMsg": err,
 			"color":    color,
 			"title":    title,
-		}).Info("Insert tag to database failed")
+		}).Info("Sql exec failed")
 
 		return err
 	}

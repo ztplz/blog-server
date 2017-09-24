@@ -32,22 +32,26 @@ func InitialRouter() {
 	}
 
 	// 博文操作
-	article := r.Group("/api/v1/article")
+	article := r.Group("/api/v1/articles")
 	{
 		article.POST("", controllers.AddArticleHandler)
 	}
 
 	// 分类名操作
-	category := r.Group("/api/v1/category")
+	category := r.Group("/api/v1/categories")
 	{
+		// 获取全部分类名 （article）true 查询每个分类的文章数
 		category.GET("", controllers.GetAllCategoryHandler)
-		category.POST("", controllers.AddCategory)
+
+		// 增加分类名
+		category.POST("", controllers.AddCategoryHandler)
+
 		category.DELETE("", controllers.DeleteCategoryHandler)
 		category.PUT("/:name", controllers.UpdateCategoryHandler)
 	}
 
 	// 标签操作
-	tag := r.Group("/api/v1/tag")
+	tag := r.Group("/api/v1/tags")
 	{
 		tag.GET("", controllers.GetAllTagHandler)
 		tag.POST("", controllers.AddTagHandler)
