@@ -1,11 +1,10 @@
-package main
+// package main
 
-import (
-	"fmt"
-	"strings"
-)
+// import (
+// 	"fmt"
+// )
 
-func main() {
-	arr := []string{"1", "2", "3", "4", "5"}
-	fmt.Println(strings.Join(arr, ""))
-}
+// func main() {
+// 	str := "吃饭"
+// 	fmt.Println(len(str))
+// }

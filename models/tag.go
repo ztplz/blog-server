@@ -35,9 +35,9 @@ func GetAllTag() ([]Tag, error) {
 
 	// 把结果写入到 tags 里
 	for rows.Next() {
-		id := 0
-		color := ""
-		tagTitle := ""
+		var id uint
+		var color string
+		var tagTitle string
 		err = rows.Scan(&id, &color, &tagTitle)
 		tags = append(tags, Tag{
 			ID:       uint(id),
