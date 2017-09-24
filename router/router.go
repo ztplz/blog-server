@@ -34,7 +34,11 @@ func InitialRouter() {
 	// 博文操作
 	article := r.Group("/api/v1/articles")
 	{
-		article.POST("", controllers.AddArticleHandler)
+		//获取所有文章列表 limit(每次返回列表数) page(页数)
+		article.GET("", controllers.GetAllArticlesHandler)
+
+		// 获取某个分类的列表  limit(每次返回列表数) page(页数)
+		// article.POST("/:category, controllers.AddArticleHandler)
 	}
 
 	// 分类名操作
