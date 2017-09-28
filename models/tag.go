@@ -19,7 +19,7 @@ const (
 )
 
 // GetAllTag 获取全部标签
-func GetAllTag() ([]Tag, error) {
+func GetAllTag() (*[]Tag, error) {
 	tags := make([]Tag, 0)
 
 	// 从数据库查询所有不同的tag
@@ -54,7 +54,7 @@ func GetAllTag() ([]Tag, error) {
 		return nil, err
 	}
 
-	return tags, err
+	return &tags, err
 }
 
 // AddTag 增加标签

@@ -14,13 +14,13 @@ type Category struct {
 
 const (
 	qAddCategory    = "INSERT INTO category_list (category) VALUES (?)"
-	qGetAllCategory = "SELECT category FROM category_list"
+	qGetAllCategory = "SELECT id, category FROM category_list"
 	qDeleteCategory = "DELETE FROM category_list WHERE category = ?"
 	qUpdateCategory = "UPDATE category_list SET category = ? WHERE category = ?"
 )
 
 // AddCategory 增加分类名
-func AddCategory(category string) error {
+func AddCategory(category string) (lastID int64, error) {
 	stmt, err := DB.Prepare(qAddCategory)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -28,26 +28,37 @@ func AddCategory(category string) error {
 			"category": category,
 		}).Info("Sql prepare failed")
 
-		return err
+		return nil, err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(category)
+	res, err := stmt.Exec(category)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
 			"category": category,
 		}).Info("Sql Exec failed")
 
-		return err
+		return nil, err
 	}
 
-	return nil
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+			"category": category,
+		}).Info("LastInsertId Exec failed")
+
+		return nil, err
+	}
+
+	return lastID, nil
 }
 
 // GetAllCategory 获取全部分类名
-func GetAllCategory() ([]string, error) {
-	categories := make([]string, 0)
+func GetAllCategory() ([]Category, error) {
+	var categories []Category
+
 	rows, err := DB.Query(qGetAllCategory)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -59,9 +70,10 @@ func GetAllCategory() ([]string, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var category string
-		err = rows.Scan(&category)
+		var category Category
+		err = rows.Scan(&category.ID, &category.Category)
 		categories = append(categories, category)
+		log.Info(categories)
 	}
 	err = rows.Err()
 	if err != nil {

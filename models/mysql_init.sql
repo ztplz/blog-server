@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `article` (
   `article_previewtext` text                    NOT NULL,
   `article_content`     text                    NOT NULL,
   `top`                 TINYINT(1)              NOT NULL DEFAULT 0,
-  `category`            varchar(255)            NOT NULL DEFAULT '',
+  `category`            INT(11)  UNSIGNED       NOT NULL DEFAULT 0,
   `tag_list`            varchar(255)            NOT NULL DEFAULT '',
   primary key (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS `tags` (
   `id`              INT(11) UNSIGNED    NOT NULL AUTO_INCREMENT,
   `color`           varchar(255)        NOT NULL DEFAULT '',
   `tag_title`       varchar(255)        NOT NULL DEFAULT '',
-  `article_id`      INT(11) UNSIGNED    NOT NULL DEFAULT 0,
+  -- `article_id`      INT(11) UNSIGNED    NOT NULL DEFAULT 0,
   primary key (id)        
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
