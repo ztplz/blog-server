@@ -191,6 +191,22 @@ func AdminLoginHandler(c *gin.Context) {
 		return
 	}
 
+	// 把管理员 token 放入 redis里, token不同步进数据库
+	err = models.RedisClient.Set("admin_token", tokenString, Timeout).Err()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "Generate token failed",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Store token to redis failed",
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Admin login failed")
+
+		return
+	}
+
 	// 生成token成功
 	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOK,

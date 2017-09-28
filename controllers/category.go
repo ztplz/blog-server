@@ -45,7 +45,7 @@ func AddCategoryHandler(c *gin.Context) {
 	}
 
 	// 向数据库添加分类名
-	err = models.AddCategory(categoryVals.Category)
+	lastID, err := models.AddCategory(categoryVals.Category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"statusCode": http.StatusInternalServerError,
@@ -71,21 +71,59 @@ func AddCategoryHandler(c *gin.Context) {
 		"category":   categoryVals.Category,
 		"statusCode": http.StatusOK,
 	}).Info("Add category success")
+
+	// 向redis 写入 此次数据
+	err := models.RedisClient.HSet("categories", string(lastID), models.Category{ID: uint(lastID), Category: catgoryVals}, 0).Err()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"id":       lastID,
+			"category": categoryVals,
+		}).Info("Store category to redis failed")
+	}
 }
 
 // GetAllCategoryHandler 获取全部分类名或者分类名包含的博文
 func GetAllCategoryHandler(c *gin.Context) {
-	categories, err := models.GetAllCategory()
+	// 从redis 里获取所有 category 的值
+	categories, err := models.RedisClient.HVals("category").Result()
+
+	// 如果从 redis 查询失败或者不存在 就从数据库读取全部分类名返回给用户, 并同步缺失的数据到 redis 里
 	if err != nil {
-		c.JSON(500, gin.H{
-			"statusCode": http.StatusInternalServerError,
-			"message":    http.StatusText(http.StatusInternalServerError),
-		})
-		c.AbortWithStatus(http.StatusInternalServerError)
 		log.WithFields(log.Fields{
-			"message":    "Query categories failed",
-			"statusCode": http.StatusInternalServerError,
-		}).Info("Get all categories failed")
+			"errorMsg": err,
+		}).Info("Get all categories from redis failed")
+
+		// 从数据库获取全部分类名
+		categories, err := models.GetAllCategory()
+		if err != nil {
+			c.JSON(500, gin.H{
+				"statusCode": http.StatusInternalServerError,
+				"message":    http.StatusText(http.StatusInternalServerError),
+			})
+			c.AbortWithStatus(http.StatusInternalServerError)
+			log.WithFields(log.Fields{
+				"message":    "Query categories failed",
+				"statusCode": http.StatusInternalServerError,
+			}).Info("Get all categories failed")
+
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"statusCode": http.StatusOK,
+			"categories": categories,
+		})
+
+		// 同步到 redis 里
+		for _, category := range categories {
+			err := models.RedisClient.hset("categories", string(category.ID), category).Result()
+			if err != nil {
+				log.WithFields(log.Fields{
+					"errorMsg": err,
+					"category": category,
+				}).Info("Sync category to redis failed")
+			}
+		}
 
 		return
 	}

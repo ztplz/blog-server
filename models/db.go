@@ -38,5 +38,7 @@ func InitialDB() {
 		}).Fatal("Database ping failed")
 	}
 
+	log.Info("Mysql connect success")
+
 	DB = db
 }

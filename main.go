@@ -22,14 +22,18 @@ func main() {
 	// log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(os.Stdout)
 
+	// 初始化连接redis
+	models.InitialRedis()
+	defer models.RedisClient.Close()
+
 	// 初始化数据库连接
 	models.InitialDB()
+	defer models.DB.Close()
 
 	// 初始化管理员账户
 	models.InitialAdmin()
 
 	// 初始化路由
 	router.InitialRouter()
-
-	defer models.DB.Close()
+	
 }

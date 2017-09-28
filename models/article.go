@@ -26,7 +26,7 @@ type Article struct {
 	ArticlePreviewText string `db:"article_previewtext" json:"article_previewtext"`
 	ArticleContent     string `db:"article_content" json:"article_content"`
 	Top                bool   `db:"top" json:"top"`
-	Category           string `db:"category" json:"category"`
+	Category           uint   `db:"category" json:"category"`
 	TagList            string `db:"tag_list" json:"tag_list"`
 }
 
@@ -54,13 +54,15 @@ func AddArticle(article *Article) error {
 }
 
 // GetArticleByPage 分页查询
-func GetArticleByPage(page int64, limit int64) (*[]Article, error) {
+func GetArticleByPage(limit int64, page int64) (*[]Article, error) {
 	var article Article
 	var articles []Article
+
 	// 查询偏移量
 	offset := (page - 1) * limit
 
 	rows, err := DB.Query(qGetArticleByPage, offset, limit)
+	// rows, err := DB.Query(qGetArticleByPage, 0, 30)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
@@ -74,18 +76,6 @@ func GetArticleByPage(page int64, limit int64) (*[]Article, error) {
 
 	for rows.Next() {
 		// 这里以后优化性能
-		// var id 					uint
-		// var createAt 			string
-		// var updateAt 			string
-		// var visitCount 			uint
-		// var replyCount 			uint
-		// var articleTitle 		string
-		// var articlePreviewtext 	string
-		// var articleContent 		string
-		// var top 				bool
-		// var category 			string
-		// var tagList 			string
-
 		err = rows.Scan(
 			&article.ID,
 			&article.CreateAt,

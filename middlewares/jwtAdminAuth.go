@@ -22,6 +22,7 @@ var secretKey = []byte("adminblog")
 // Timeout token持续时间, 设置为一周
 var Timeout = time.Hour * 24 * 7
 
+// AdminLogin  管理员登录表单
 type AdminLogin struct {
 	AdminID  string `form:"admin_id" json:"admin_id" binding:"required"`
 	Password string `form:"password" json:"password" binding:"required"`
@@ -109,9 +110,19 @@ func parseToken(c *gin.Context) (*jwt.Token, error) {
 
 	parts := strings.Split("header:Authorization", ":")
 	token, err = jwtFromHeader(c, parts[1])
-
 	if err != nil {
 		return nil, err
+	}
+
+	// 查询 redis 里是否有这个token
+	adminToken, err := models.RedisClient.Get("admin_token").Result()
+	if err != nil {
+		return nil, err
+	}
+
+	// 比对token
+	if token != adminToken {
+		return nil, errors.New("Token is not match")
 	}
 
 	return jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {

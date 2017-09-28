@@ -18,12 +18,28 @@ type ArticleForm struct {
 	ArticleTitle       string   `form:"article_title" json:"article_title" binding:"required"`
 	ArticlePreviewText string   `form:"article_previewtext" json:"article_previewtext" binding:"required"`
 	ArticleContent     string   `form:"article_content" json:"article_content" binding:"required"`
-	Category           string   `form:"category" json:"category" binding:"required"`
+	Category           uint     `form:"category" json:"category" binding:"required"`
 	Tags               []string `form:"tags" json:"tags" binding:"required"`
+}
+
+// ArticleRes 定义博文响应的结构体
+type ArticleRes struct {
+	ID                 uint            `json:"id"`
+	CreateAt           string          `json:"creat_at"`
+	UpdateAt           string          `json:"update_at"`
+	VisitCount         uint            `json:"visit_count"`
+	ReplyCount         uint            `json:"reply_count"`
+	ArticleTitle       string          `json:"article_title"`
+	ArticlePreviewText string          `json:"article_previewtext"`
+	ArticleContent     string          `json:"article_content"`
+	Top                bool            `json:"top"`
+	Category           models.Category `json:"category"`
+	TagList            []models.Tag    `json:"tag_list"`
 }
 
 // GetAllArticlesHandler 获取文章列表
 func GetAllArticlesHandler(c *gin.Context) {
+	var articlesRes []ArticleRes
 	// 获取查询参数
 	limitString := c.DefaultQuery("limit", "10")
 	pageString := c.DefaultQuery("page", "1")
@@ -65,17 +81,78 @@ func GetAllArticlesHandler(c *gin.Context) {
 		return
 	}
 
-	// 查询 博文
+	// 查询所有的分类 ID
+	categories, err := models.GetAllCategory()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Query category failed",
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Get articles failed")
+
+		return
+	}
+
+	// 查询所有标签
+	tags, err := models.GetAllTag()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Query tag failed",
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Get articles failed")
+
+		return
+	}
+
+	// 查询博文
 	articles, err := models.GetArticleByPage(limit, page)
 	for _, article := range *articles {
-		*&article.TagList = strings.Split(*&article.TagList, "_")
+		log.Info("categories", categories)
+		category := categoryForRes(article.Category, &categories)
+		tagList, err := tagForRes(article.TagList, tags)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"statusCode": http.StatusInternalServerError,
+				"message":    http.StatusText(http.StatusInternalServerError),
+			})
+			c.AbortWithStatus(http.StatusInternalServerError)
+			log.WithFields(log.Fields{
+				"errorMsg":   err,
+				"statusCode": http.StatusInternalServerError,
+			}).Info("Get articles failed")
+		}
+		articlesRes = append(articlesRes, ArticleRes{
+			ID:                 article.ID,
+			CreateAt:           article.CreateAt,
+			UpdateAt:           article.UpdateAt,
+			VisitCount:         article.VisitCount,
+			ReplyCount:         article.ReplyCount,
+			ArticleTitle:       article.ArticleTitle,
+			ArticlePreviewText: article.ArticlePreviewText,
+			ArticleContent:     article.ArticleContent,
+			Top:                article.Top,
+			Category:           category,
+			TagList:            tagList,
+		})
 	}
-	articles.TagList = strings.Split(articles.TagList, "_")
 
-	c.JSON(http.StatusBadRequest, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOK,
-		"data":       articles,
+		"data":       articlesRes,
 	})
+
+	log.WithFields(log.Fields{
+		"statusCode": http.StatusOK,
+	}).Info("Get articles success")
 }
 
 // AddArticleHandler 增加文章
@@ -193,4 +270,43 @@ func AddArticleHandler(c *gin.Context) {
 		"title":      articleVals.ArticleTitle,
 		"create_at":  time.Now().Format("2006-01-02 15:04:05"),
 	}).Info("Add article success")
+}
+
+// 根据数据库的category id返回相应的分类
+func categoryForRes(id uint, categories *[]models.Category) models.Category {
+	var category models.Category
+	log.Info(*categories)
+
+	for _, value := range *categories {
+		log.Info(id)
+		log.Info(value)
+		if value.ID == id {
+			category = value
+
+			break
+		}
+	}
+
+	return category
+}
+
+// 根据数据的 tag_list 返回相应的标签组
+func tagForRes(tagStr string, tags *[]models.Tag) ([]models.Tag, error) {
+	var tagSlice []models.Tag
+	tagStrSlice := strings.Split(tagStr, "_")
+	for _, tagID := range tagStrSlice {
+		t, err := strconv.ParseUint(tagID, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range *tags {
+			ut := uint(t)
+			if tag.ID == ut {
+				tagSlice = append(tagSlice, tag)
+			}
+		}
+
+	}
+
+	return tagSlice, nil
 }

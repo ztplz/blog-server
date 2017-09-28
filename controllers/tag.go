@@ -21,7 +21,6 @@ type TagForm struct {
 func GetAllTagHandler(c *gin.Context) {
 	tags, err := models.GetAllTag()
 	if err != nil {
-		log.Println(err)
 		c.JSON(500, gin.H{
 			"message": "query failed",
 		})
