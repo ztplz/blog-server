@@ -207,6 +207,17 @@ func AdminLoginHandler(c *gin.Context) {
 		return
 	}
 
+	val, err := models.RedisClient.Get("admin_token").Result()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"admin_token": err,
+		}).Info("get admin token failed")
+	}
+
+	log.WithFields(log.Fields{
+		"admin_token": val,
+	}).Info("admin_token success")
+
 	// 生成token成功
 	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOK,
