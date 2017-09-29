@@ -1,3 +1,12 @@
+/*
+* jwt token 验证模块
+*
+* author: ztplz
+* email: mysticzt@gmail.com
+* github: https://github.com/ztplz
+* create-at: 2017.08.15
+ */
+
 package middlewares
 
 import (

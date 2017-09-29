@@ -58,7 +58,7 @@ func GetAllTag() (*[]Tag, error) {
 }
 
 // AddTag 增加标签
-func AddTag(color string, title string) error {
+func AddTag(color string, title string) (int64, error) {
 	// 向数据库插入标签
 	stmt, err := DB.Prepare(qAddTag)
 	if err != nil {
@@ -68,11 +68,11 @@ func AddTag(color string, title string) error {
 			"title":    title,
 		}).Info("Sql prepare failed")
 
-		return err
+		return 0, err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(color, title)
+	res, err := stmt.Exec(color, title)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
@@ -80,10 +80,21 @@ func AddTag(color string, title string) error {
 			"title":    title,
 		}).Info("Sql exec failed")
 
-		return err
+		return 0, err
 	}
 
-	return nil
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+			"color":    color,
+			"title":    title,
+		}).Info("LastInsertId Exec failed")
+
+		return 0, err
+	}
+
+	return lastID, nil
 }
 
 // 修改标签

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 
 	log "github.com/sirupsen/logrus"
@@ -20,7 +21,7 @@ const (
 )
 
 // AddCategory 增加分类名
-func AddCategory(category string) (lastID int64, error) {
+func AddCategory(category string) (int64, error) {
 	stmt, err := DB.Prepare(qAddCategory)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -28,7 +29,7 @@ func AddCategory(category string) (lastID int64, error) {
 			"category": category,
 		}).Info("Sql prepare failed")
 
-		return nil, err
+		return 0, err
 	}
 	defer stmt.Close()
 
@@ -39,7 +40,7 @@ func AddCategory(category string) (lastID int64, error) {
 			"category": category,
 		}).Info("Sql Exec failed")
 
-		return nil, err
+		return 0, err
 	}
 
 	lastID, err := res.LastInsertId()
@@ -49,7 +50,7 @@ func AddCategory(category string) (lastID int64, error) {
 			"category": category,
 		}).Info("LastInsertId Exec failed")
 
-		return nil, err
+		return 0, err
 	}
 
 	return lastID, nil
@@ -138,4 +139,9 @@ func UpdateCategory(category string, key string) error {
 
 	return nil
 
+}
+
+// MarshalBinary 增加编码成二进制的方法
+func (mc *Category) MarshalBinary() ([]byte, error) {
+	return json.Marshal(mc)
 }

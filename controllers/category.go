@@ -1,6 +1,21 @@
+/*
+* 分类名处理
+*
+* 分类名以 hash 的格式存储在 redis 里，
+* 并且以在 mysql 中的主键作为存在 redis 里的 field 名，
+* 以次来映射 redis 里分类名和 mysql 里的分类名的关系
+*
+*
+* author: ztplz
+* email: mysticzt@gmail.com
+* github: https://github.com/ztplz
+* create-at: 2017.08.15
+ */
+
 package controllers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -15,9 +30,6 @@ import (
 type CategoryForm struct {
 	Category string `form:"category" json:"category" binding:"required"`
 }
-
-// 获取全部分类名的数据结构
-// type Categories []string
 
 // AddCategoryHandler 新增一个分类名
 func AddCategoryHandler(c *gin.Context) {
@@ -38,6 +50,39 @@ func AddCategoryHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
 			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Add category failed")
+
+		return
+	}
+
+	// 检查是否有重复分类
+	b, err := checkRepeatCategory("categories", categoryVals.Category)
+	if err != nil {
+		// 直接返回错误码500
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Add category failed")
+
+		return
+	}
+
+	// 如果已经存在一样的分类名
+	if b {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "Category already exist",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Category already exist",
+			"category":   categoryVals.Category,
 			"statusCode": http.StatusBadRequest,
 		}).Info("Add category failed")
 
@@ -68,15 +113,28 @@ func AddCategoryHandler(c *gin.Context) {
 	// 打印成功增加分类名的日志
 	log.WithFields(log.Fields{
 		"message":    "Add category success",
+		"lastID":     lastID,
 		"category":   categoryVals.Category,
 		"statusCode": http.StatusOK,
 	}).Info("Add category success")
 
 	// 向redis 写入 此次数据
-	err := models.RedisClient.HSet("categories", string(lastID), models.Category{ID: uint(lastID), Category: catgoryVals}, 0).Err()
+	category, _ := json.Marshal(models.Category{ID: uint(lastID), Category: categoryVals.Category})
+	// log.Info(string(category))
+	// log.WithFields(log.Fields{
+	// 	"stringcategory": string(category),
+	// 	"category":       category,
+	// }).Info("asdfasgdads")
+	// strcategory := new(models.Category)
+	// _ = json.Unmarshal(category, &strcategory)
+	// log.WithFields(log.Fields{
+	// 	"category": *strcategory,
+	// }).Info("asdfasgdads")
+	err = models.RedisClient.HSet("categories", string(lastID), category).Err()
 	if err != nil {
 		log.WithFields(log.Fields{
 			"id":       lastID,
+			"errorMsg": err,
 			"category": categoryVals,
 		}).Info("Store category to redis failed")
 	}
@@ -85,7 +143,7 @@ func AddCategoryHandler(c *gin.Context) {
 // GetAllCategoryHandler 获取全部分类名或者分类名包含的博文
 func GetAllCategoryHandler(c *gin.Context) {
 	// 从redis 里获取所有 category 的值
-	categories, err := models.RedisClient.HVals("category").Result()
+	categories, err := models.RedisClient.HVals("categories").Result()
 
 	// 如果从 redis 查询失败或者不存在 就从数据库读取全部分类名返回给用户, 并同步缺失的数据到 redis 里
 	if err != nil {
@@ -109,6 +167,7 @@ func GetAllCategoryHandler(c *gin.Context) {
 			return
 		}
 
+		// 返回数据给客户端
 		c.JSON(http.StatusOK, gin.H{
 			"statusCode": http.StatusOK,
 			"categories": categories,
@@ -116,7 +175,7 @@ func GetAllCategoryHandler(c *gin.Context) {
 
 		// 同步到 redis 里
 		for _, category := range categories {
-			err := models.RedisClient.hset("categories", string(category.ID), category).Result()
+			err := models.RedisClient.HSet("categories", string(category.ID), category).Err()
 			if err != nil {
 				log.WithFields(log.Fields{
 					"errorMsg": err,
@@ -128,13 +187,35 @@ func GetAllCategoryHandler(c *gin.Context) {
 		return
 	}
 
+	// gin 有个很大的问题, JSON方法会把body里的再次序列化, 所以这里把数据从 redis 里取出来后又被 JSON方法 序列化
+	cts := new([]models.Category)
+	for _, value := range categories {
+		ct := new(models.Category)
+		err := json.Unmarshal([]byte(value), &ct)
+		if err != nil {
+			c.JSON(500, gin.H{
+				"statusCode": http.StatusInternalServerError,
+				"message":    http.StatusText(http.StatusInternalServerError),
+			})
+			c.AbortWithStatus(http.StatusInternalServerError)
+			log.WithFields(log.Fields{
+				"errorMsg":   err,
+				"statusCode": http.StatusInternalServerError,
+			}).Info("Unmasrshal category failed")
+
+			return
+		}
+
+		*cts = append(*cts, *ct)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOK,
-		"categories": categories,
+		"categories": *cts,
 	})
 
 	log.WithFields(log.Fields{
-		"categories": categories,
+		"categories": *cts,
 		"statusCode": http.StatusOK,
 	}).Info("Get all categories success")
 }
@@ -215,30 +296,40 @@ func UpdateCategoryHandler(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "update success",
 	})
+}
 
-	// err = c.ShouldBindWith(&categoryVals, binding.JSON)
-	// if err != nil {
-	// 	log.Println(err)
-	// 	c.JSON(400, gin.H{
-	// 		"message": "Miss category field",
-	// 	})
-	// 	c.AbortWithError(400, errors.New("Miss category field"))
+// 就检查是否重复提交已存在分类名
+func checkRepeatCategory(key string, field string) (bool, error) {
+	// 首先开始从 redis 里查询
+	categories, err := models.RedisClient.HVals(key).Result()
+	if err != nil {
+		// 从数据库里查询
+		categories, err := models.GetAllCategory()
+		if err != nil {
+			return false, err
+		}
 
-	// 	return
-	// }
+		for _, category := range categories {
+			if category.Category == field {
+				return true, nil
+			}
+		}
 
-	// err = models.DeleteCategory(categoryVals.Category)
-	// log.Println(err)
-	// if err != nil {
-	// 	c.JSON(500, gin.H{
-	// 		"message": "failed",
-	// 	})
-	// 	c.AbortWithError(400, errors.New("failed"))
+		return false, nil
+	}
 
-	// 	return
-	// }
+	ct := models.Category{}
+	for _, value := range categories {
+		err := json.Unmarshal([]byte(value), &ct)
+		if err != nil {
+			return false, err
+		}
 
-	// c.JSON(200, gin.H{
-	// 	"message": "success",
-	// })
+		// 判断是否和以前的分类名相同
+		if ct.Category == field {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
