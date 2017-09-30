@@ -29,6 +29,9 @@ func InitialRouter() {
 
 		// 后台登录
 		admin.POST("", controllers.AdminLoginHandler)
+
+		// 管理员退出后台
+		admin.DELETE("", controllers.AdminLogout)
 	}
 
 	// 博文操作

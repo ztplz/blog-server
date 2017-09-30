@@ -118,18 +118,8 @@ func AddCategoryHandler(c *gin.Context) {
 		"statusCode": http.StatusOK,
 	}).Info("Add category success")
 
-	// 向redis 写入 此次数据
+	// 把数据更新到 redis
 	category, _ := json.Marshal(models.Category{ID: uint(lastID), Category: categoryVals.Category})
-	// log.Info(string(category))
-	// log.WithFields(log.Fields{
-	// 	"stringcategory": string(category),
-	// 	"category":       category,
-	// }).Info("asdfasgdads")
-	// strcategory := new(models.Category)
-	// _ = json.Unmarshal(category, &strcategory)
-	// log.WithFields(log.Fields{
-	// 	"category": *strcategory,
-	// }).Info("asdfasgdads")
 	err = models.RedisClient.HSet("categories", string(lastID), category).Err()
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -175,7 +165,8 @@ func GetAllCategoryHandler(c *gin.Context) {
 
 		// 同步到 redis 里
 		for _, category := range categories {
-			err := models.RedisClient.HSet("categories", string(category.ID), category).Err()
+			ct, _ := json.Marshal(models.Category{ID: category.ID, Category: category.Category})
+			err := models.RedisClient.HSet("categories", string(category.ID), ct).Err()
 			if err != nil {
 				log.WithFields(log.Fields{
 					"errorMsg": err,
@@ -183,6 +174,10 @@ func GetAllCategoryHandler(c *gin.Context) {
 				}).Info("Sync category to redis failed")
 			}
 		}
+
+		log.WithFields(log.Fields{
+			"message": "Sync categories to redis success",
+		}).Info("Sync categories to redis success")
 
 		return
 	}
@@ -248,7 +243,6 @@ func DeleteCategoryHandler(c *gin.Context) {
 	}
 
 	err = models.DeleteCategory(categoryVals.Category)
-	log.Println(err)
 	if err != nil {
 		c.JSON(500, gin.H{
 			"message": "failed",
