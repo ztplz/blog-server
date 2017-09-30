@@ -129,6 +129,11 @@ func parseToken(c *gin.Context) (*jwt.Token, error) {
 		return nil, err
 	}
 
+	// 如果 redis 里token为空值
+	if adminToken == "" {
+		return nil, errors.New("You don't login in")
+	}
+
 	// 比对token
 	if token != adminToken {
 		return nil, errors.New("Token is not match")

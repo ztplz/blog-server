@@ -15,6 +15,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -64,25 +65,52 @@ func GetAllTagHandler(c *gin.Context) {
 
 		// 同步到 redis 里
 		for _, tag := range *tags {
-			b, err := models.RedisClient.HSet("tags", string(tag.ID), tag).Result()
-			if !b || err != nil {
+			mt, _ := json.Marshal(models.Tag{ID: tag.ID, Color: tag.Color, TagTitle: tag.TagTitle})
+			err := models.RedisClient.HSet("tags", string(tag.ID), mt).Err()
+			if err != nil {
 				log.WithFields(log.Fields{
 					"errorMsg": err,
 					"tag":      tag,
-				}).Info("Sync to to redis failed")
+				}).Info("Sync tag to redis failed")
 			}
 		}
+
+		log.WithFields(log.Fields{
+			"message": "Sync tags to redis success",
+		}).Info("Sync tags to redis success")
 
 		return
 	}
 
+	// 反序列化
+	mts := new([]models.Tag)
+	for _, value := range tags {
+		mt := new(models.Tag)
+		err := json.Unmarshal([]byte(value), &mt)
+		if err != nil {
+			c.JSON(500, gin.H{
+				"statusCode": http.StatusInternalServerError,
+				"message":    http.StatusText(http.StatusInternalServerError),
+			})
+			c.AbortWithStatus(http.StatusInternalServerError)
+			log.WithFields(log.Fields{
+				"errorMsg":   err,
+				"statusCode": http.StatusInternalServerError,
+			}).Info("Unmasrshal tag failed")
+
+			return
+		}
+
+		*mts = append(*mts, *mt)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOK,
-		"tags":       tags,
+		"tags":       mts,
 	})
 
 	log.WithFields(log.Fields{
-		"tags":       tags,
+		"tags":       mts,
 		"statusCode": http.StatusOK,
 	}).Info("Get all tags success")
 }
@@ -107,6 +135,39 @@ func AddTagHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
 			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Add tag failed")
+
+		return
+	}
+
+	// 检查是否有重复分类
+	b, err := checkRepeatTag("tags", tagVals.TagTitle)
+	if err != nil {
+		// 直接返回错误码500
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Add tag failed")
+
+		return
+	}
+
+	// 如果已经存在一样的分类名
+	if b {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "Tag already exist",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Tag already exist",
+			"category":   tagVals.TagTitle,
 			"statusCode": http.StatusBadRequest,
 		}).Info("Add tag failed")
 
@@ -140,8 +201,9 @@ func AddTagHandler(c *gin.Context) {
 	}).Info("Add tag to mysql success")
 
 	// 同步更新到 redis 里
-	b, err := models.RedisClient.HSet("tags", string(lastID), models.Tag{ID: uint(lastID), Color: tagVals.Color, TagTitle: tagVals.TagTitle}).Result()
-	if !b || err != nil {
+	tag, _ := json.Marshal(models.Tag{ID: uint(lastID), Color: tagVals.Color, TagTitle: tagVals.TagTitle})
+	err = models.RedisClient.HSet("tags", string(lastID), tag).Err()
+	if err != nil {
 		log.WithFields(log.Fields{
 			"id":  lastID,
 			"tag": tagVals,
@@ -172,16 +234,20 @@ func checkRepeatTag(key string, field string) (bool, error) {
 			}
 		}
 
-		return false, nil
+		return false, err
 	}
 
-	for _, tag := range tags {
-		log.WithFields(log.Fields{
-			"tag": tag,
-		}).Info("tagxxxxxxx")
-		// if tag.TagTitle == field {
-		// 	return true, nil
-		// }
+	mt := models.Tag{}
+	for _, value := range tags {
+		err := json.Unmarshal([]byte(value), &mt)
+		if err != nil {
+			return false, err
+		}
+
+		// 判断是否和以前的分类名相同
+		if mt.TagTitle == field {
+			return true, nil
+		}
 	}
 
 	return false, nil

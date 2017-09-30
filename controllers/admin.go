@@ -256,7 +256,7 @@ func GetAdminInfo(c *gin.Context) {
 	}
 
 	// 验证成功，返回管理员信息
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"statusCode":    http.StatusOK,
 		"admin_name":    admin.AdminName,
 		"image":         admin.Image,
@@ -272,4 +272,40 @@ func GetAdminInfo(c *gin.Context) {
 		"ip":            admin.IP,
 		"statusCode":    http.StatusOK,
 	}).Info("Get admin infomation success")
+}
+
+// AdminLogout 管理员退出
+func AdminLogout(c *gin.Context) {
+	// token 认证
+	_, err := middlewares.AdminAuthMiddleware(c)
+	if err != nil {
+		return
+	}
+
+	// 把 redis 里的 admin_token 设置为空字符串
+	err = models.RedisClient.Set("admin_token", "", 0).Err()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "Admin log out failed",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Admin login out failed")
+
+		return
+	}
+
+	// 管理员成功退出
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "Admin log out success",
+	})
+
+	log.WithFields(log.Fields{
+		"message":    "Admin log out success",
+		"statusCode": http.StatusOK,
+	}).Info("Admin login out success")
 }
