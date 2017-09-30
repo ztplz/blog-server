@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -81,7 +82,7 @@ func GetAllArticlesHandler(c *gin.Context) {
 		return
 	}
 
-	// 查询所有的分类 ID
+	// 首先从 redis 里查询所有的分类 ID
 	categories, err := models.GetAllCategory()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -244,7 +245,7 @@ func AddArticleHandler(c *gin.Context) {
 	}
 
 	// 存储博文数据进数据库
-	err = models.AddArticle(article)
+	lastID, err := models.AddArticle(article)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"statusCode": http.StatusInternalServerError,
@@ -261,6 +262,7 @@ func AddArticleHandler(c *gin.Context) {
 
 	c.JSON(200, gin.H{
 		"success": "true",
+		"id":      lastID,
 		"message": "Add article success",
 	})
 
@@ -270,6 +272,49 @@ func AddArticleHandler(c *gin.Context) {
 		"title":      articleVals.ArticleTitle,
 		"create_at":  time.Now().Format("2006-01-02 15:04:05"),
 	}).Info("Add article success")
+
+	// 把新增博文同步更新到 redis 里, 每次 mysql 更新成功都把所有 articles 同步到 redis
+	articles := new([]models.Article)
+	for count := 0; count < 3; count++ {
+		articles, err = models.GetAllArticle()
+		if err == nil && len(*articles) != 0 {
+			break
+		}
+
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Get all article failed")
+	}
+
+	for _, value := range *articles {
+		ma, _ := json.Marshal(value)
+		_ = models.RedisClient.RPush("article", ma)
+	}
+
+	// ma, _ := json.Marshal(models.Article{
+	// 	ID:                 uint(lastID),
+	// 	CreateAt:           article.CreateAt,
+	// 	UpdateAt:           article.UpdateAt,
+	// 	VisitCount:         article.VisitCount,
+	// 	ReplyCount:         article.ReplyCount,
+	// 	ArticleTitle:       article.ArticleTitle,
+	// 	ArticlePreviewText: article.ArticlePreviewText,
+	// 	ArticleContent:     article.ArticleContent,
+	// 	Top:                false,
+	// 	Category:           article.Category,
+	// 	TagList:            article.TagList,
+	// })
+	// err = models.RedisClient.RPush("articles", ma).Err()
+	// if err != nil {
+	// 	log.WithFields(log.Fields{
+	// 		"errorMsg": err,
+	// 		"article":  article,
+	// 	}).Info("Sync article to redis failed")
+
+	// 	return
+	// }
+
+	log.WithFields(log.Fields{}).Info("Sync article to redis success")
 }
 
 // 根据数据库的category id返回相应的分类

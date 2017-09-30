@@ -1,3 +1,14 @@
+/*
+* admin controller
+*
+* token 1天后过期。每次使用延长6个小时，最长使用时效为一周
+*
+* author: ztplz
+* email: mysticzt@gmail.com
+* github: https://github.com/ztplz
+* create-at: 2017.08.15
+ */
+
 package controllers
 
 import (
@@ -23,6 +34,8 @@ var secretKey = []byte("adminblog")
 
 // Timeout token持续时间, 设置为一周
 var Timeout = time.Hour * 24 * 7
+
+// var Timeout = time.Second * 3600
 
 // AdminLoginForm 登录表单
 type AdminLoginForm struct {
@@ -192,7 +205,7 @@ func AdminLoginHandler(c *gin.Context) {
 	}
 
 	// 把管理员 token 放入 redis里, token不同步进数据库
-	err = models.RedisClient.Set("admin_token", tokenString, Timeout).Err()
+	err = models.RedisClient.Set("admin_token", tokenString, time.Hour*24).Err()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"statusCode": http.StatusInternalServerError,
@@ -207,23 +220,12 @@ func AdminLoginHandler(c *gin.Context) {
 		return
 	}
 
-	val, err := models.RedisClient.Get("admin_token").Result()
-	if err != nil {
-		log.WithFields(log.Fields{
-			"admin_token": err,
-		}).Info("get admin token failed")
-	}
-
-	log.WithFields(log.Fields{
-		"admin_token": val,
-	}).Info("admin_token success")
-
 	// 生成token成功
 	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOK,
 		"message":    "login success",
 		"token":      tokenString,
-		"expire":     expire.Format(time.RFC3339),
+		"max_expire": expire.Format(time.RFC3339),
 	})
 
 	// 记录成功登录时间和 ip
