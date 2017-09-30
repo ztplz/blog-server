@@ -45,7 +45,7 @@ func GetAllArticlesHandler(c *gin.Context) {
 	limitString := c.DefaultQuery("limit", "10")
 	pageString := c.DefaultQuery("page", "1")
 
-	// 转换 limitString, page 为 int 类型
+	// 转换 limitString, page 为 int64 类型
 	limit, lerr := strconv.ParseInt(limitString, 10, 32)
 	page, perr := strconv.ParseInt(pageString, 10, 32)
 	if lerr != nil || perr != nil {
@@ -82,7 +82,54 @@ func GetAllArticlesHandler(c *gin.Context) {
 		return
 	}
 
-	// 首先从 redis 里查询所有的分类 ID
+	// 首先从 redis 里查询博文
+	articles, err := models.RedisClient.LRange("articles", (page-1)*limit, page*limit).Result()
+	marticles := new([]models.Article)
+	marticle := new(models.Article)
+	for _, article := range articles {
+		err := json.Unmarshal([]byte(article), &marticle)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"errorMsg":   err,
+				"limit":      limit,
+				"pageString": page,
+			}).Info("Get articles from redis failed")
+
+			break
+		}
+
+		*marticles = append(*marticles, *marticle)
+	}
+
+	// 用长度判断反序列化过程中有没有错误，是否该从mysql拉取数据
+	if len(*marticles) == int(limit) {
+		for _, value := range *marticles {
+
+		}
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusOk,
+			"articles":   *marticles,
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Parameter must above 0",
+			"limit":      limit,
+			"pageString": page,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Get articles failed")
+
+		return
+	}
+
+	// 首先从 redis 里查询所有的分类 ID\
+
+	keys, err := models.RedisClient.HKeys("category").Result()
+	ukeys := new([]uint)
+	for _, value := range keys {
+		uvalue := value
+		ukeys = append(ukeys)
+	}
+
 	categories, err := models.GetAllCategory()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -288,7 +335,9 @@ func AddArticleHandler(c *gin.Context) {
 
 	for _, value := range *articles {
 		ma, _ := json.Marshal(value)
-		_ = models.RedisClient.RPush("article", ma)
+
+		// 向链表头push，因为都是倒序查找
+		_ = models.RedisClient.LPush("article", ma)
 	}
 
 	// ma, _ := json.Marshal(models.Article{
