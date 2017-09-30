@@ -29,7 +29,8 @@ var SigningAlgorithm = "HS256"
 var secretKey = []byte("adminblog")
 
 // Timeout token持续时间, 设置为一周
-var Timeout = time.Hour * 24 * 7
+// var Timeout = time.Hour * 24 * 7
+var Timeout = time.Second
 
 // AdminLogin  管理员登录表单
 type AdminLogin struct {
@@ -95,6 +96,14 @@ func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
 		return nil, errors.New("Incorrect token")
 	}
 
+	// redis延长6个小时 token 存储时间
+	err = models.RedisClient.Set("admin_token", token, time.Hour*6).Err()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Admin token store to redis failed")
+	}
+
 	return admin, nil
 }
 
@@ -126,12 +135,12 @@ func parseToken(c *gin.Context) (*jwt.Token, error) {
 	// 查询 redis 里是否有这个token
 	adminToken, err := models.RedisClient.Get("admin_token").Result()
 	if err != nil {
-		return nil, err
+		return nil, errors.New("token is expired")
 	}
 
 	// 如果 redis 里token为空值
 	if adminToken == "" {
-		return nil, errors.New("You don't login in")
+		return nil, errors.New("You don't login in or token expired")
 	}
 
 	// 比对token

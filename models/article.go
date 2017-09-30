@@ -9,6 +9,7 @@ const (
 	// ArticlePreviewTextLengthMax 文章预览最多字符数
 	ArticlePreviewTextLengthMax = 300
 
+	qGetAllArticle    = "SELECT * FROM article"
 	qAddArticle       = "INSERT INTO article (create_at, update_at, visit_count, reply_count, article_title, article_previewtext, article_content, top, category, tag_list) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	qGetArticleByPage = `SELECT id, create_at, update_at, visit_count, reply_count, article_title, article_previewtext, article_content, top, category, tag_list 
 						FROM article 
@@ -31,26 +32,38 @@ type Article struct {
 }
 
 // AddArticle 增加文章
-func AddArticle(article *Article) error {
+func AddArticle(article *Article) (int64, error) {
 	stmt, err := DB.Prepare(qAddArticle)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"errorMsg": err.Error(),
+			"errorMsg": err,
+			"article":  *article,
 		}).Info("Sql prepare failed")
 
-		return err
+		return 0, err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(article.CreateAt, article.UpdateAt, article.VisitCount, article.ReplyCount, article.ArticleTitle, article.ArticlePreviewText, article.ArticleContent, article.Top, article.Category, article.TagList)
+	res, err := stmt.Exec(article.CreateAt, article.UpdateAt, article.VisitCount, article.ReplyCount, article.ArticleTitle, article.ArticlePreviewText, article.ArticleContent, article.Top, article.Category, article.TagList)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"errorMsg": err.Error(),
+			"errorMsg": err,
+			"article":  *article,
 		}).Info("Sql Exec failed")
-		return err
+		return 0, err
 	}
 
-	return nil
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+			"article":  *article,
+		}).Info("LastInsertId Exec failed")
+
+		return 0, err
+	}
+
+	return lastID, nil
 }
 
 // GetArticleByPage 分页查询
@@ -69,6 +82,50 @@ func GetArticleByPage(limit int64, page int64) (*[]Article, error) {
 			"page":     page,
 			"limit":    limit,
 		}).Info("DB query article failed")
+
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		// 这里以后优化性能
+		err = rows.Scan(
+			&article.ID,
+			&article.CreateAt,
+			&article.UpdateAt,
+			&article.VisitCount,
+			&article.ReplyCount,
+			&article.ArticleTitle,
+			&article.ArticlePreviewText,
+			&article.ArticleContent,
+			&article.Top,
+			&article.Category,
+			&article.TagList)
+		articles = append(articles, article)
+	}
+	err = rows.Err()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Rows scan failed")
+
+		return nil, err
+	}
+
+	return &articles, nil
+}
+
+// GetAllArticle 取出所有博文
+func GetAllArticle() (*[]Article, error) {
+	var article Article
+	var articles []Article
+
+	// 查询所有博文
+	rows, err := DB.Query(qGetAllArticle)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("DB query all article failed")
 
 		return nil, err
 	}

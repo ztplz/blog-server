@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 
 	log "github.com/sirupsen/logrus"
@@ -138,10 +137,4 @@ func UpdateCategory(category string, key string) error {
 	}
 
 	return nil
-
-}
-
-// MarshalBinary 增加编码成二进制的方法
-func (mc *Category) MarshalBinary() ([]byte, error) {
-	return json.Marshal(mc)
 }

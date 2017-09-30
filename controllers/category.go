@@ -128,6 +128,12 @@ func AddCategoryHandler(c *gin.Context) {
 			"category": categoryVals,
 		}).Info("Store category to redis failed")
 	}
+
+	log.WithFields(log.Fields{
+		"id":       lastID,
+		"errorMsg": err,
+		"category": categoryVals,
+	}).Info("Sync category to redis failed")
 }
 
 // GetAllCategoryHandler 获取全部分类名或者分类名包含的博文
