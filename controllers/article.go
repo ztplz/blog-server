@@ -40,7 +40,6 @@ type ArticleRes struct {
 
 // GetAllArticlesHandler 获取文章列表
 func GetAllArticlesHandler(c *gin.Context) {
-	var articlesRes []ArticleRes
 	// 获取查询参数
 	limitString := c.DefaultQuery("limit", "10")
 	pageString := c.DefaultQuery("page", "1")
@@ -83,178 +82,95 @@ func GetAllArticlesHandler(c *gin.Context) {
 	}
 
 	// 首先从 redis 里查询博文
-	articles, err := models.RedisClient.LRange("articles", (page-1)*limit, page*limit).Result()
-	
-	// 如果从 redis 取博文数据时产生错误，接着用从 mysql 里取
+	articlesRes, err := getArticlesFromRedis(limit, page)
 	if err != nil {
-		// 从数据库查询所有分类名
-		categories, err := models.GetAllCategory()
+		// redis查询失败，从数据库查询
+		articlesRes, err := getArticlesFromDatabase(limit, page)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"statusCode": http.StatusInternalServerError,
 				"message":    http.StatusText(http.StatusInternalServerError),
 			})
 			c.AbortWithStatus(http.StatusInternalServerError)
-			log.WithFields(log.Fields{
-				"errorMsg":   "Query category failed",
-				"statusCode": http.StatusInternalServerError,
-			}).Info("Get articles failed")
-	
-			return
-		}
-	
-		// 查询所有标签
-		tags, err := models.GetAllTag()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"statusCode": http.StatusInternalServerError,
-				"message":    http.StatusText(http.StatusInternalServerError),
-			})
-			c.AbortWithStatus(http.StatusInternalServerError)
-			log.WithFields(log.Fields{
-				"errorMsg":   "Query tag failed",
-				"statusCode": http.StatusInternalServerError,
-			}).Info("Get articles failed")
-	
-			return
-		}
-
-		// 查询博文
-		articles, err := models.GetArticleByPage(limit, page)
-		for _, article := range *articles {
-			category := categoryForRes(article.Category, &categories)
-			tagList, err := tagForRes(article.TagList, tags)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"statusCode": http.StatusInternalServerError,
-					"message":    http.StatusText(http.StatusInternalServerError),
-				})
-				c.AbortWithStatus(http.StatusInternalServerError)
-				log.WithFields(log.Fields{
-					"errorMsg":   err,
-					"statusCode": http.StatusInternalServerError,
-				}).Info("Get articles failed")
-			}
-			articlesRes = append(articlesRes, ArticleRes{
-				
-			})
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"statusCode": http.StatusOK,
-			"data":       articlesRes,
-		})
-
-		log.WithFields(log.Fields{
-			"statusCode": http.StatusOK,
-		}).Info("Get articles success")
-	
-	}
-
-	marticles := new([]models.Article)
-	marticle := new(models.Article)
-	for _, article := range articles {
-		err := json.Unmarshal([]byte(article), &marticle)
-		if err != nil {
 			log.WithFields(log.Fields{
 				"errorMsg":   err,
 				"limit":      limit,
 				"pageString": page,
-			}).Info("Get articles from redis failed")
+				"statusCode": http.StatusInternalServerError,
+			}).Info("Get articles failed")
 
-			break
+			return
 		}
 
-		*marticles = append(*marticles, *marticle)
-	}
-
-	// 用长度判断反序列化过程中有没有错误，是否该从mysql拉取数据
-	if len(*marticles) == int(limit) {
-		for _, article := range *marticles {
-			mcategory, err := models.RedisClient.HGet("categories", string(article.Category)).Result()
-			if err != nil {
-				log.WithFields(log.Fields{
-					"errorMsg":   err,
-					"limit":      limit,
-					"pageString": page,
-				}).Info("Get article's category  from redis failed")
-
-				break
-			}
-
-			category := new([]models.Category)
-			err = json.Unmarshal([]byte(mcategory), &category)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"errorMsg": err,
-				}).Info("Get article's category from redis failed")
-
-				break
-			}
-
-			// 把字符串转化成数字 id
-			stag := strings.Split(article.TagList, "_")
-			for _, value := range stag {
-				mtag, err := models.RedisClient.HGet("tags", value).Result()
-				if err != nil {
-					log.WithFields(log.Fields{
-						"errorMsg":   err,
-					}).Info("Get article's category  from redis failed")
-	
-					break
-				}
-			}
-
-			category := new([]models.Category)
-			err = json.Unmarshal([]byte(mcategory), &category)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"errorMsg": err,
-				}).Info("Get article's category from redis failed")
-
-				break
-			} 
-
-			articlesRes = append(ArticlesRes, models.ArticleRes{
-				ID: article.ID,
-				CreateAt: article.CreateAt,
-				UpdateAt: article.UpdateAt,    
-				VisitCount: article.VisitCount,
-				ReplyCount: article.ReplyCount,
-				ArticleTitle: article.ArticleTitle,
-				ArticlePreviewText: article.ArticlePreviewText,
-				ArticleContent: article.ArticleContent,
-				Top: article.Top,              
-				Category: category,        
-				TagList      
-			})
-		}
-		c.JSON(http.StatusBadRequest, gin.H{
-			"statusCode": http.StatusOk,
-			"articles":   *marticles,
+		// 从数据库查询成功
+		c.JSON(http.StatusOK, gin.H{
+			"statusCode": http.StatusOK,
+			"articles":   *articlesRes,
 		})
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.AbortWithStatus(http.StatusOK)
 		log.WithFields(log.Fields{
-			"errorMsg":   "Parameter must above 0",
+			"message":    "Get articles success",
 			"limit":      limit,
 			"pageString": page,
-			"statusCode": http.StatusBadRequest,
-		}).Info("Get articles failed")
+			"statusCode": http.StatusOK,
+		}).Info("Get articles success")
+
+		// 把所有博文同步到 redis里
+		articles, err := models.GetAllArticle()
+		if err != nil {
+			log.WithFields(log.Fields{
+				"errorMsg": err,
+			}).Info("Sync all articles to redis failed")
+
+			return
+		}
+
+		// 清楚 redis 里的博文
+		err = models.RedisClient.Del("articles").Err()
+		if err != nil {
+			log.WithFields(log.Fields{
+				"errorMsg": err,
+			}).Info("Delete articles from redis failed")
+
+			return
+		}
+
+		for _, article := range *articles {
+			marticle, err := json.Marshal(article)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"errorMsg": err,
+				}).Info("Sync articles to redis failed")
+
+				return
+			}
+
+			err = models.RedisClient.LPush("articles", marticle).Err()
+			if err != nil {
+				log.WithFields(log.Fields{
+					"errorMsg": err,
+				}).Info("Sync articles to redis failed")
+
+				return
+			}
+		}
+
+		log.Info("Sync articles to redis success")
 
 		return
 	}
 
-	// 首先从 redis 里查询所有的分类 ID\
-
-	keys, err := models.RedisClient.HKeys("category").Result()
-	ukeys := new([]uint)
-	for _, value := range keys {
-		uvalue := value
-		ukeys = append(ukeys)
-	}
-
-	
-	
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"articles":   *articlesRes,
+	})
+	c.AbortWithStatus(http.StatusOK)
+	log.WithFields(log.Fields{
+		"message":    "Get articles success",
+		"limit":      limit,
+		"pageString": page,
+		"statusCode": http.StatusInternalServerError,
+	}).Info("Get articles success")
 }
 
 // AddArticleHandler 增加文章
@@ -461,16 +377,21 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 	articlesRes := new([]ArticleRes)
 
 	// 从redis里获取需要的博文
-	marticles, err := models.RedisClient.LRange((page-1) * limit, page * limit).Result()
+	marticles, err := models.RedisClient.LRange("articles", (page-1)*limit, page*limit).Result()
 	if err != nil {
 		return nil, err
 	}
 
 	// articles 反序列化
 	articles := new([]models.Article)
-	err = json.Unmarshal(marticles, articles)
-	if err != nil {
-		return nil, err
+	article := new(models.Article)
+	for _, marticle := range marticles {
+		err := json.Unmarshal([]byte(marticle), article)
+		if err != nil {
+			return nil, err
+		}
+
+		*articles = append(*articles, *article)
 	}
 
 	// 遍历 articles
@@ -483,9 +404,14 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 
 		// category 反序列化
 		categories := new([]models.Category)
-		err = json.Unmarshal(mcategories, categories)
-		if err != nil {
-			return nil, err
+		category := new(models.Category)
+		for _, mcategory := range mcategories {
+			err = json.Unmarshal([]byte(mcategory), category)
+			if err != nil {
+				return nil, err
+			}
+
+			*categories = append(*categories, *category)
 		}
 
 		// 从 redis 里取出所有标签
@@ -496,16 +422,21 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 
 		// tags 反序列化
 		tags := new([]models.Tag)
-		err = json.Unmarshal(mtags, tags)
-		if err != nil {
-			return nil, err
+		tag := new(models.Tag)
+		for _, mtag := range mtags {
+			err = json.Unmarshal([]byte(mtag), tag)
+			if err != nil {
+				return nil, err
+			}
+
+			*tags = append(*tags, *tag)
 		}
-		
+
 		// 获取每个博文的标签
 		tagsForRes := new([]models.Tag)
 		tagListStr := strings.Split(article.TagList, "_")
-		for _, tagStr = range tagListStr {
-			tagsForRes = append(tagForRes, tags[tagStr])
+		for _, tagStr := range tagListStr {
+			*tagsForRes = append(*tagForRes, *tags[tagStr])
 		}
 
 		// 生成 response 内容
@@ -553,10 +484,21 @@ func getArticlesFromDatabase(limit int64, page int64) (*[]ArticleRes, error) {
 	category := new(models.Category)
 	tag := new(models.Tag)
 	for _, article := range *articles {
-		
+
 		for _, value := range categories {
 			if value.ID == article.Category {
-				&category = value 
+				&category = value
+			}
+		}
+
+		tagListStr := string.Split(article.TagList, "_")
+		tagList := new([]Tag)
+		for _, tagStr := range tagListStr {
+			for _, value := range *tags {
+				if string(value.ID) == tagStr {
+					&tag = value
+					*tagList = append(*tagList, tag)
+				}
 			}
 		}
 
@@ -571,18 +513,8 @@ func getArticlesFromDatabase(limit int64, page int64) (*[]ArticleRes, error) {
 			ArticleContent:     article.ArticleContent,
 			Top:                article.Top,
 			Category:           *category,
-			TagList:            tagsForRes,
+			TagList:            *tagList,
 		})
-		
-		if err != nil {
-			return nil, err
-		}
-		category := json.Unmarshal(mcategory, category)
 
-		tagList := strings.Split(article.TagList, "_")
-		for _, tagIndex := range tagList {
-			
-		} 
-		mtag, err := models.RedisClient.HGet("")
 	}
 }
