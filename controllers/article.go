@@ -374,6 +374,10 @@ func tagForRes(tagStr string, tags *[]models.Tag) ([]models.Tag, error) {
 
 	}
 
+	if len(tagSlice) == 0 {
+		return nil, errors.New("Don't found tag")
+	}
+
 	return tagSlice, nil
 }
 
@@ -408,19 +412,21 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 		}
 
 		// category 反序列化
-
 		categories := new([]models.Category)
-		category, err := categoryForRes(article.Category, categories)
-		// category := new(models.Category)
-		// ca
-		// for _, mcategory := range mcategories {
-		// 	err = json.Unmarshal([]byte(mcategory), category)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
+		category := new(models.Category)
+		for _, mcategory := range mcategories {
+			err := json.Unmarshal([]byte(mcategory), category)
+			if err != nil {
+				return nil, err
+			}
 
-		// 	*categories = append(*categories, *category)
-		// }
+			*categories = append(*categories, *category)
+		}
+
+		categoryRes, err := categoryForRes(article.Category, categories)
+		if err != nil {
+			return nil, err
+		}
 
 		// 从 redis 里取出所有标签
 		mtags, err := models.RedisClient.HGetAll("tags").Result()
@@ -441,8 +447,6 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 		}
 
 		// 获取每个博文的标签
-		// tagsForRes := new([]models.Tag)
-		// tagListStr := strings.Split(article.TagList, "_")
 		tagsForRes, err := tagForRes(article.TagList, tags)
 		if err != nil {
 			return nil, err
@@ -459,7 +463,7 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 			ArticlePreviewText: article.ArticlePreviewText,
 			ArticleContent:     article.ArticleContent,
 			Top:                article.Top,
-			Category:           category,
+			Category:           categoryRes,
 			TagList:            tagsForRes,
 		})
 	}
@@ -469,7 +473,7 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 
 // 从 mysql 中获取博文数据
 func getArticlesFromDatabase(limit int64, page int64) (*[]ArticleRes, error) {
-	ArticlesRes := new([]ArticleRes)
+	articlesRes := new([]ArticleRes)
 
 	// 从数据库获取特定数量的博文
 	articles, err := models.GetArticleByPage(limit, page)
@@ -490,28 +494,17 @@ func getArticlesFromDatabase(limit int64, page int64) (*[]ArticleRes, error) {
 	}
 
 	// 遍历查询出的博文
-	category := new(models.Category)
-	tag := new(models.Tag)
 	for _, article := range *articles {
-
-		for _, value := range categories {
-			if value.ID == article.Category {
-				&category = value
-			}
+		// 找出需要的分类名
+		category, err := categoryForRes(article.Category, &categories)
+		if err != nil {
+			return nil, err
 		}
 
-		tagListStr := string.Split(article.TagList, "_")
-		tagList := new([]Tag)
-		for _, tagStr := range tagListStr {
-			for _, value := range *tags {
-				if string(value.ID) == tagStr {
-					&tag = value
-					*tagList = append(*tagList, tag)
-				}
-			}
-		}
+		// 找出需要的标签
+		tagList, err := tagForRes(article.TagList, tags)
 
-		articlesRes = append(articlesRes, ArticleRes{
+		*articlesRes = append(*articlesRes, ArticleRes{
 			ID:                 article.ID,
 			CreateAt:           article.CreateAt,
 			UpdateAt:           article.UpdateAt,
@@ -521,9 +514,11 @@ func getArticlesFromDatabase(limit int64, page int64) (*[]ArticleRes, error) {
 			ArticlePreviewText: article.ArticlePreviewText,
 			ArticleContent:     article.ArticleContent,
 			Top:                article.Top,
-			Category:           *category,
-			TagList:            *tagList,
+			Category:           category,
+			TagList:            tagList,
 		})
 
 	}
+
+	return articlesRes, nil
 }
