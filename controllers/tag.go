@@ -210,7 +210,13 @@ func AddTagHandler(c *gin.Context) {
 	}).Info("Add tag to mysql success")
 
 	// 同步更新到 redis 里
-	tag, _ := json.Marshal(models.Tag{ID: uint(lastID), Color: tagVals.Color, TagTitle: tagVals.TagTitle})
+	tag, err := json.Marshal(models.Tag{ID: uint(lastID), Color: tagVals.Color, TagTitle: tagVals.TagTitle})
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Add tag to redis failed")
+	}
+
 	err = models.RedisClient.HSet("tags", string(lastID), tag).Err()
 	if err != nil {
 		log.WithFields(log.Fields{
