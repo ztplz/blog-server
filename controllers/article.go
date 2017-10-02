@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -125,7 +126,7 @@ func GetAllArticlesHandler(c *gin.Context) {
 			return
 		}
 
-		// 清楚 redis 里的博文
+		// 清除 redis 里的博文
 		err = models.RedisClient.Del("articles").Err()
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -337,7 +338,7 @@ func AddArticleHandler(c *gin.Context) {
 }
 
 // 根据数据库的category id返回相应的分类
-func categoryForRes(id uint, categories *[]models.Category) models.Category {
+func categoryForRes(id uint, categories *[]models.Category) (models.Category, error) {
 	var category models.Category
 
 	for _, value := range *categories {
@@ -348,7 +349,11 @@ func categoryForRes(id uint, categories *[]models.Category) models.Category {
 		}
 	}
 
-	return category
+	if category == (models.Category{}) {
+		return category, errors.New("Don't found category")
+	}
+
+	return category, nil
 }
 
 // 根据数据的 tag_list 返回相应的标签组
@@ -403,16 +408,19 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 		}
 
 		// category 反序列化
-		categories := new([]models.Category)
-		category := new(models.Category)
-		for _, mcategory := range mcategories {
-			err = json.Unmarshal([]byte(mcategory), category)
-			if err != nil {
-				return nil, err
-			}
 
-			*categories = append(*categories, *category)
-		}
+		categories := new([]models.Category)
+		category, err := categoryForRes(article.Category, categories)
+		// category := new(models.Category)
+		// ca
+		// for _, mcategory := range mcategories {
+		// 	err = json.Unmarshal([]byte(mcategory), category)
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+
+		// 	*categories = append(*categories, *category)
+		// }
 
 		// 从 redis 里取出所有标签
 		mtags, err := models.RedisClient.HGetAll("tags").Result()
@@ -433,14 +441,15 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 		}
 
 		// 获取每个博文的标签
-		tagsForRes := new([]models.Tag)
-		tagListStr := strings.Split(article.TagList, "_")
-		for _, tagStr := range tagListStr {
-			*tagsForRes = append(*tagForRes, *tags[tagStr])
+		// tagsForRes := new([]models.Tag)
+		// tagListStr := strings.Split(article.TagList, "_")
+		tagsForRes, err := tagForRes(article.TagList, tags)
+		if err != nil {
+			return nil, err
 		}
 
 		// 生成 response 内容
-		articlesRes = append(articlesRes, ArticleRes{
+		*articlesRes = append(*articlesRes, ArticleRes{
 			ID:                 article.ID,
 			CreateAt:           article.CreateAt,
 			UpdateAt:           article.UpdateAt,
@@ -450,7 +459,7 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 			ArticlePreviewText: article.ArticlePreviewText,
 			ArticleContent:     article.ArticleContent,
 			Top:                article.Top,
-			Category:           categories[string(article.Category)],
+			Category:           category,
 			TagList:            tagsForRes,
 		})
 	}
