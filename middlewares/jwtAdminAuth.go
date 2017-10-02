@@ -97,7 +97,12 @@ func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
 	}
 
 	// redis延长6个小时 token 存储时间
-	err = models.RedisClient.Set("admin_token", token, time.Hour*6).Err()
+	rtoken, err := models.RedisClient.Get("admin_token").Result()
+	if err != nil {
+		return nil, err
+	}
+
+	err = models.RedisClient.Set("admin_token", rtoken, time.Hour*6).Err()
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,

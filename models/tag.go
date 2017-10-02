@@ -94,6 +94,8 @@ func AddTag(color string, title string) (int64, error) {
 		return 0, err
 	}
 
+	log.Info(lastID)
+
 	return lastID, nil
 }
 

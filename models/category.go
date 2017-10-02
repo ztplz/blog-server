@@ -73,7 +73,6 @@ func GetAllCategory() ([]Category, error) {
 		var category Category
 		err = rows.Scan(&category.ID, &category.Category)
 		categories = append(categories, category)
-		log.Info(categories)
 	}
 	err = rows.Err()
 	if err != nil {
