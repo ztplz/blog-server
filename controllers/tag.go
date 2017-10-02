@@ -65,8 +65,17 @@ func GetAllTagHandler(c *gin.Context) {
 
 		// 同步到 redis 里
 		for _, tag := range *tags {
-			mt, _ := json.Marshal(models.Tag{ID: tag.ID, Color: tag.Color, TagTitle: tag.TagTitle})
-			err := models.RedisClient.HSet("tags", string(tag.ID), mt).Err()
+			mt, err := json.Marshal(models.Tag{ID: tag.ID, Color: tag.Color, TagTitle: tag.TagTitle})
+			if err != nil {
+				log.WithFields(log.Fields{
+					"errorMsg": err,
+					"tag":      tag,
+				}).Info("Sync tag to redis failed")
+
+				continue
+			}
+
+			err = models.RedisClient.HSet("tags", string(tag.ID), mt).Err()
 			if err != nil {
 				log.WithFields(log.Fields{
 					"errorMsg": err,

@@ -171,13 +171,24 @@ func GetAllCategoryHandler(c *gin.Context) {
 
 		// 同步到 redis 里
 		for _, category := range categories {
-			ct, _ := json.Marshal(models.Category{ID: category.ID, Category: category.Category})
-			err := models.RedisClient.HSet("categories", string(category.ID), ct).Err()
+			ct, err := json.Marshal(models.Category{ID: category.ID, Category: category.Category})
 			if err != nil {
 				log.WithFields(log.Fields{
 					"errorMsg": err,
 					"category": category,
 				}).Info("Sync category to redis failed")
+
+				return
+			}
+
+			err = models.RedisClient.HSet("categories", string(category.ID), ct).Err()
+			if err != nil {
+				log.WithFields(log.Fields{
+					"errorMsg": err,
+					"category": category,
+				}).Info("Sync category to redis failed")
+
+				return
 			}
 		}
 
@@ -192,7 +203,7 @@ func GetAllCategoryHandler(c *gin.Context) {
 	cts := new([]models.Category)
 	for _, value := range categories {
 		ct := new(models.Category)
-		err := json.Unmarshal([]byte(value), &ct)
+		err := json.Unmarshal([]byte(value), ct)
 		if err != nil {
 			c.JSON(500, gin.H{
 				"statusCode": http.StatusInternalServerError,
