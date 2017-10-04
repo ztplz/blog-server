@@ -15,7 +15,7 @@ func InitialRedis() {
 		Addr: "localhost:6379",
 
 		// redis 连接密码
-		Password: "123456",
+		// Password: "123456",
 
 		// redis 连接的数据库,使用默认的数据库
 		DB: 0,
