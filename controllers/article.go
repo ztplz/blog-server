@@ -312,31 +312,8 @@ func AddArticleHandler(c *gin.Context) {
 		ma, _ := json.Marshal(value)
 
 		// 向链表头push，因为都是倒序查找
-		_ = models.RedisClient.LPush("article", ma)
+		_ = models.RedisClient.LPush("articles", ma)
 	}
-
-	// ma, _ := json.Marshal(models.Article{
-	// 	ID:                 uint(lastID),
-	// 	CreateAt:           article.CreateAt,
-	// 	UpdateAt:           article.UpdateAt,
-	// 	VisitCount:         article.VisitCount,
-	// 	ReplyCount:         article.ReplyCount,
-	// 	ArticleTitle:       article.ArticleTitle,
-	// 	ArticlePreviewText: article.ArticlePreviewText,
-	// 	ArticleContent:     article.ArticleContent,
-	// 	Top:                false,
-	// 	Category:           article.Category,
-	// 	TagList:            article.TagList,
-	// })
-	// err = models.RedisClient.RPush("articles", ma).Err()
-	// if err != nil {
-	// 	log.WithFields(log.Fields{
-	// 		"errorMsg": err,
-	// 		"article":  article,
-	// 	}).Info("Sync article to redis failed")
-
-	// 	return
-	// }
 
 	log.WithFields(log.Fields{}).Info("Sync article to redis success")
 }
@@ -358,7 +335,7 @@ func categoryForRes(id uint, categories *[]models.Category) models.Category {
 }
 
 // 根据数据的 tag_list 返回相应的标签组
-func tagForRes(tagStr string, tags *[]models.Tag) []models.Tag {
+func tagForRes(tagStr string, tags *[]models.Tag) ([]models.Tag, error) {
 	var tagSlice []models.Tag
 	tagStrSlice := strings.Split(tagStr, "_")
 	for _, tagID := range tagStrSlice {
@@ -366,23 +343,51 @@ func tagForRes(tagStr string, tags *[]models.Tag) []models.Tag {
 		// if err != nil {
 		// 	return nil, err
 		// }
+
 		for _, tag := range *tags {
-			if string(tag.ID) == tagID {
+			ti, err := strconv.ParseUint(tagID, 10, 0)
+			if err != nil {
+				return nil, err
+			}
+
+			if tag.ID == uint(ti) {
 				tagSlice = append(tagSlice, tag)
 			}
 		}
 
 	}
 
-	return tagSlice
+	return tagSlice, nil
 }
 
 // 从 redis 中获取博文数据
 func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 	articlesRes := new([]ArticleRes)
 
+	// 判断查询是否越界
+	al, err := models.RedisClient.LLen("articles").Result()
+	if err != nil {
+		return nil, err
+	}
+
+	// 定义查询区间
+	var qstart int64
+	var qend int64
+
+	if limit*page > al {
+		qstart = al - al%limit - 1
+		qend = al - 1
+	}
+
+	qstart = limit * (page - 1)
+	qend = limit * page
+
+	log.Info(al)
+	log.Info(qstart)
+	log.Info(qend)
+
 	// 从redis里获取需要的博文
-	marticles, err := models.RedisClient.LRange("articles", (page-1)*limit, (page*limit - 1)).Result()
+	marticles, err := models.RedisClient.LRange("articles", qstart, qend).Result()
 	// marticles, err := models.RedisClient.LRange("articles", page, 1).Result()
 	if err != nil {
 		return nil, err
@@ -442,12 +447,8 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 		*tags = append(*tags, *tag)
 	}
 
-	log.Info(111111111)
-
 	// 遍历 articles
 	for _, article := range *articles {
-
-		log.Info(11111)
 
 		categoryRes := categoryForRes(article.Category, &categories)
 		if len(categories) == 0 {
@@ -455,8 +456,11 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 		}
 
 		// 获取每个博文的标签
-		log.Info(article.TagList)
-		tagsForRes := tagForRes(article.TagList, tags)
+		tagsForRes, err := tagForRes(article.TagList, tags)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(tagsForRes) == 0 {
 			return nil, errors.New("Don't found tag from redis")
 		}
@@ -511,7 +515,11 @@ func getArticlesFromDatabase(limit int64, page int64) (*[]ArticleRes, error) {
 		}
 
 		// 找出需要的标签
-		tagsForRes := tagForRes(article.TagList, tags)
+		tagsForRes, err := tagForRes(article.TagList, tags)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(tagsForRes) == 0 {
 			return nil, errors.New("Don't found tag from mysql")
 		}

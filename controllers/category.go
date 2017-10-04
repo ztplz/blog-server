@@ -119,21 +119,28 @@ func AddCategoryHandler(c *gin.Context) {
 	}).Info("Add category success")
 
 	// 把数据更新到 redis
-	category, _ := json.Marshal(models.Category{ID: uint(lastID), Category: categoryVals.Category})
+	category, err := json.Marshal(models.Category{ID: uint(lastID), Category: categoryVals.Category})
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+			"category": categoryVals,
+		}).Info("Marshal category failed")
+	}
+
 	err = models.RedisClient.HSet("categories", string(lastID), category).Err()
 	if err != nil {
 		log.WithFields(log.Fields{
 			"id":       lastID,
 			"errorMsg": err,
 			"category": categoryVals,
-		}).Info("Store category to redis failed")
+		}).Info("Sync category to redis failed")
 	}
 
 	log.WithFields(log.Fields{
 		"id":       lastID,
 		"errorMsg": err,
 		"category": categoryVals,
-	}).Info("Sync category to redis failed")
+	}).Info("Sync category to redis success")
 }
 
 // GetAllCategoryHandler 获取全部分类名或者分类名包含的博文
@@ -164,6 +171,7 @@ func GetAllCategoryHandler(c *gin.Context) {
 		}
 
 		// 返回数据给客户端
+		log.Info(categories)
 		c.JSON(http.StatusOK, gin.H{
 			"statusCode": http.StatusOK,
 			"categories": categories,
@@ -221,15 +229,24 @@ func GetAllCategoryHandler(c *gin.Context) {
 		*cts = append(*cts, *ct)
 	}
 
+	// if len(*cts) == 0 {
+	// 	c.JSON(http.StatusOK, gin.H{
+	// 		"statusCode": http.StatusOK,
+	// 		"categories": "[]",
+	// 	})
+	// }
+
 	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOK,
 		"categories": *cts,
 	})
 
+	log.Info(*cts)
+
 	log.WithFields(log.Fields{
 		"categories": *cts,
 		"statusCode": http.StatusOK,
-	}).Info("Get all categories success")
+	}).Info("Get all categories from redis success")
 }
 
 // DeleteCategoryHandler 删除某个分类名
