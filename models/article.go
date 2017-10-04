@@ -1,6 +1,8 @@
 package models
 
-import log "github.com/sirupsen/logrus"
+import (
+	log "github.com/sirupsen/logrus"
+)
 
 const (
 	// ArticleTitleLengthMax 文章最多标题数
@@ -9,6 +11,7 @@ const (
 	// ArticlePreviewTextLengthMax 文章预览最多字符数
 	ArticlePreviewTextLengthMax = 300
 
+	qGetArticleCount  = "SELECT COUNT(*) as count FROM article"
 	qGetAllArticle    = "SELECT * FROM article"
 	qAddArticle       = "INSERT INTO article (create_at, update_at, visit_count, reply_count, article_title, article_previewtext, article_content, top, category, tag_list) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	qGetArticleByPage = `SELECT id, create_at, update_at, visit_count, reply_count, article_title, article_previewtext, article_content, top, category, tag_list 
@@ -71,10 +74,42 @@ func GetArticleByPage(limit int64, page int64) (*[]Article, error) {
 	var article Article
 	var articles []Article
 
-	// 查询偏移量
-	offset := (page - 1) * limit
+	// 查询区间
+	crows, err := DB.Query(qGetArticleCount)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Query article count failed")
 
-	rows, err := DB.Query(qGetArticleByPage, offset, limit)
+		return nil, err
+	}
+	defer crows.Close()
+
+	var counts int64
+
+	for crows.Next() {
+		err = crows.Scan(&counts)
+	}
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Scan article count failed")
+
+		return nil, err
+	}
+
+	var qoffset int64
+	var qlimit int64
+
+	if limit*page > counts {
+		qoffset = limit*(page-1) + 1
+		qlimit = counts - limit*(page-1)
+	}
+
+	qoffset = limit*(page-1) + 1
+	qlimit = limit
+
+	rows, err := DB.Query(qGetArticleByPage, qoffset, qlimit)
 	// rows, err := DB.Query(qGetArticleByPage, 0, 30)
 	if err != nil {
 		log.WithFields(log.Fields{

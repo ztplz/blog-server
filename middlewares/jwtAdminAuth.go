@@ -140,6 +140,10 @@ func parseToken(c *gin.Context) (*jwt.Token, error) {
 	// 查询 redis 里是否有这个token
 	adminToken, err := models.RedisClient.Get("admin_token").Result()
 	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Admin auth failed")
+
 		return nil, errors.New("token is expired")
 	}
 
