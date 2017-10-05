@@ -12,6 +12,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"regexp"
 	"strings"
@@ -43,6 +44,11 @@ type AdminLoginForm struct {
 	Password string `form:"password" json:"password" binding:"required"`
 }
 
+// AdminUpdatePasswordForm 更改密码表单
+type AdminUpdatePasswordForm struct {
+	Password string `form:"password" json:"password" binding:"required"`
+}
+
 // AdminLoginHandler 管理员登录，没有限制同一个ip的错误登录次数，容易被爆破，以后加登录序列
 func AdminLoginHandler(c *gin.Context) {
 	var loginVals AdminLoginForm
@@ -68,51 +74,64 @@ func AdminLoginHandler(c *gin.Context) {
 		return
 	}
 
-	// 管理员账号，密码两边除去换行符和空格
-	adminID := strings.TrimSpace(loginVals.AdminID)
-	password := strings.TrimSpace(loginVals.Password)
-
-	// 判断管理员账号，密码是否由数字和字母组成
-	a, _ := regexp.MatchString("^[A-Za-z0-9]+$", adminID)
-	b, _ := regexp.MatchString("^[A-Za-z0-9]+$", password)
-	if !a || !b {
+	// 检验 adminID
+	adminID, err := checkString(loginVals.AdminID)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"statusCode": http.StatusBadRequest,
-			"message":    "Incorrect format",
+			"message":    "Incorrect adminID format",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
-			"errorMsg":   "Incorrect format",
+			"errorMsg":   err,
 			"statusCode": http.StatusBadRequest,
 		}).Info("Admin login failed")
 
 		return
 	}
 
-	// 判断管理员账户是否符合规定长度
-	if len(adminID) < models.AdminIDLengthMin || len(adminID) > models.AdminIDLengthMax {
+	// 检验password
+	password, err := checkString(loginVals.Password)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"statusCode": http.StatusBadRequest,
-			"message":    "Incorrect adminID Length",
+			"message":    "Incorrect password format",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
-			"errorMsg":   "Incorrect adminID Length",
+			"errorMsg":   err,
 			"statusCode": http.StatusBadRequest,
 		}).Info("Admin login failed")
 
 		return
 	}
 
-	// 判断密码是否符合规定长度
-	if len(password) < models.AdminPasswordLengthMin || len(password) > models.AdminPasswordLengthMax {
+	// 检验 adminID 是否规定长度
+	ab := checkAdminIDLength(adminID)
+	if !ab {
 		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequet,
+			"message":    "Incorrect adminID length",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
 			"statusCode": http.StatusBadRequest,
+		}).Info("Admin login failed")
+
+		return
+	}
+
+	// 检验 password 是否规定长度
+	pb := checkPasswrodLength(password)
+	if !pb {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequet,
 			"message":    "Incorrect password length",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
-			"errorMsg":   "Incorrect password length",
+			"errorMsg":   err,
 			"statusCode": http.StatusBadRequest,
 		}).Info("Admin login failed")
 
@@ -310,4 +329,111 @@ func AdminLogout(c *gin.Context) {
 		"message":    "Admin log out success",
 		"statusCode": http.StatusOK,
 	}).Info("Admin login out success")
+}
+
+// AdminUpdatePassword 更改管理员密码
+func AdminUpdatePassword(c *gin.Context) {
+	var adminUpdatePasswordVals AdminUpdatePasswordForm
+
+	// token 认证
+	admin, err := middlewares.AdminAuthMiddleware(c)
+	if err != nil {
+		return
+	}
+
+	// 检查是否绑定了 password field
+	err = c.ShouldBindWith(&adminUpdatePasswordVals, binding.JSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "Miss password",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Miss password",
+			"statusCode": http.StatusBadRequest,
+		}).Info("Admin change password failed")
+
+		return
+	}
+
+	// 检查密码是否规定
+	password, err := checkString(adminUpdatePasswordVals)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "Incorrect password format",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Incorrect password format",
+			"statusCode": http.StatusBadRequest,
+		}).Info("Admin change password failed")
+
+		return
+	}
+
+	pb := checkAdminPasswordLength(password)
+	if !pb {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "Incorrect password length",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Incorrect password length",
+			"statusCode": http.StatusBadRequest,
+		}).Info("Admin change password failed")
+
+		return
+	}
+	
+	err = models.UpdateAdminPassword(password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    http.StatusText(http.StatusInternalServerError),
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Admin change password failed")
+
+		return
+	}
+
+}
+
+// 除去两边空格并检测字符串是否由数字和字母组成
+func checkString(str string) (string, error) {
+	// 两边除去换行符和空格
+	s := strings.TrimSpace(str)
+
+	// 判断s是否由数字和字母组成
+	matched, err := regexp.MatchString("^[A-Za-z0-9]+$", s)
+
+	if !matched || err != nil {
+		return "", errors.New("String don't match regexp")
+	}
+
+	return s, nil
+}
+
+// 检测管理员 ID 是否规定长度
+func checkAdminIDLength(adminID string) bool {
+	if len(adminID) < models.AdminIDLengthMin || len(adminID) > models.AdminIDLengthMax {
+		return false
+	}
+
+	return true
+}
+
+// 检测 password 是否规定长度
+func checkAdminPasswordLength(password string) bool {
+	if len(password) < models.AdminPasswordLengthMin || len(password) > models.AdminPasswordLengthMax {
+		return false
+	}
+
+	return true
 }
