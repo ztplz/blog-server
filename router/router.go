@@ -19,6 +19,9 @@ import (
 func InitialRouter() {
 	r := gin.Default()
 
+	// 设置单次上传文件最大限制, 允许超过 8M
+	r.MaxMultipartMemory = 8 << 20
+
 	r.Use(middlewares.CORSMiddleware())
 
 	// 管理员权限
@@ -29,6 +32,15 @@ func InitialRouter() {
 
 		// 后台登录
 		admin.POST("", controllers.AdminLoginHandler)
+
+		// 更改管理员密码
+		admin.PUT("/password", controllers.AdminUpdatePasswordhandler)
+
+		// 更改管理员信息
+		admin.PUT("", controllers.AdminUpdateInfoHandler)
+
+		// 上传管理员头像
+		admin.PUT("/image", controllers.AdminUploadImageHandler)
 
 		// 管理员退出后台
 		admin.DELETE("", controllers.AdminLogout)

@@ -49,6 +49,13 @@ type AdminUpdatePasswordForm struct {
 	Password string `form:"password" json:"password" binding:"required"`
 }
 
+// AdminUpdateInfoForm 更改管理员信息表单
+type AdminUpdateInfoForm struct {
+	AdminID   string `form:"admin_id" json:"admin_id" binding:"required"`
+	AdminName string `form:"admin_name" json:"admin_name" binding:"required"`
+	Image     string `form:"image" json:"image" binding:"required"`
+}
+
 // AdminLoginHandler 管理员登录，没有限制同一个ip的错误登录次数，容易被爆破，以后加登录序列
 func AdminLoginHandler(c *gin.Context) {
 	var loginVals AdminLoginForm
@@ -110,7 +117,7 @@ func AdminLoginHandler(c *gin.Context) {
 	ab := checkAdminIDLength(adminID)
 	if !ab {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"statusCode": http.StatusBadRequet,
+			"statusCode": http.StatusBadRequest,
 			"message":    "Incorrect adminID length",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -123,10 +130,10 @@ func AdminLoginHandler(c *gin.Context) {
 	}
 
 	// 检验 password 是否规定长度
-	pb := checkPasswrodLength(password)
+	pb := checkAdminPasswordLength(password)
 	if !pb {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"statusCode": http.StatusBadRequet,
+			"statusCode": http.StatusBadRequest,
 			"message":    "Incorrect password length",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -331,12 +338,12 @@ func AdminLogout(c *gin.Context) {
 	}).Info("Admin login out success")
 }
 
-// AdminUpdatePassword 更改管理员密码
-func AdminUpdatePassword(c *gin.Context) {
+// AdminUpdatePasswordhandler 更改管理员密码
+func AdminUpdatePasswordhandler(c *gin.Context) {
 	var adminUpdatePasswordVals AdminUpdatePasswordForm
 
 	// token 认证
-	admin, err := middlewares.AdminAuthMiddleware(c)
+	_, err := middlewares.AdminAuthMiddleware(c)
 	if err != nil {
 		return
 	}
@@ -358,7 +365,7 @@ func AdminUpdatePassword(c *gin.Context) {
 	}
 
 	// 检查密码是否规定
-	password, err := checkString(adminUpdatePasswordVals)
+	password, err := checkString(adminUpdatePasswordVals.Password)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"statusCode": http.StatusBadRequest,
@@ -387,7 +394,7 @@ func AdminUpdatePassword(c *gin.Context) {
 
 		return
 	}
-	
+
 	err = models.UpdateAdminPassword(password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -403,6 +410,107 @@ func AdminUpdatePassword(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "success",
+	})
+
+	log.WithFields(log.Fields{
+		"statusCode": http.StatusOK,
+	}).Info("Admin change password success")
+
+}
+
+// AdminUpdateInfoHandler 更改管理员信息
+func AdminUpdateInfoHandler(c *gin.Context) {
+	var adminUpdateInfoVals AdminUpdateInfoForm
+
+	// token 认证
+	_, err := middlewares.AdminAuthMiddleware(c)
+	if err != nil {
+		return
+	}
+
+	// 检查是否绑定了 password field
+	err = c.ShouldBindWith(&adminUpdateInfoVals, binding.JSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "Miss some field",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Admin change information failed")
+
+		return
+	}
+
+	// 把更新的管理员数据写入数据库
+	err = models.UpdateAdminInfo(adminUpdateInfoVals.AdminID, adminUpdateInfoVals.AdminName, adminUpdateInfoVals.Image)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "Change admin information failed",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Change admin information failed")
+
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "Change admin information success",
+	})
+
+	log.WithFields(log.Fields{
+		"statusCode": http.StatusOK,
+	}).Info("Change admin information success")
+}
+
+// AdminUploadImageHandler 上传管理员头像,不允许超过 4M
+func AdminUploadImageHandler(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "Upload image failed",
+		})
+		log.WithFields(log.Fields{
+			"message":    err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Upload image failed")
+
+		return
+	}
+
+	err = c.SaveUploadedFile(file, file.Filename)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "Upload image failed",
+		})
+		log.WithFields(log.Fields{
+			"message":    err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Upload image failed")
+
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "Upload image success",
+	})
+
+	log.WithFields(log.Fields{
+		"statusCode": http.StatusOK,
+	}).Info("Upload image success")
 }
 
 // 除去两边空格并检测字符串是否由数字和字母组成

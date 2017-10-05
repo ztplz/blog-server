@@ -22,6 +22,7 @@ const (
 	// qAll = "SELECT * FROM admin"
 	qUpdateLastLoginAt   = "UPDATE admin SET last_login_at = ?, ip = ? WHERE id = 1"
 	qUpdateAdminPassword = "UPDATE admin SET password = ? WHERE id = 1"
+	qUpdateAdminInfo     = "UPDATE admin SET admin_id = ?, admin_name = ?, image = ? WHERE id = 1"
 )
 
 // LoginAdminForm 后台登录账号密码表单结构
@@ -118,6 +119,17 @@ func UpdateTimeIP(lastLoginAt string, ip string) error {
 
 // UpdateAdminPassword 数据库更改管理员密码
 func UpdateAdminPassword(password string) error {
+	// 加密密码
+	hp, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Fatal("encrypt initial password failed")
+
+		return err
+	}
+
+	// sql预处理
 	stmt, err := DB.Prepare(qUpdateAdminPassword)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -128,11 +140,36 @@ func UpdateAdminPassword(password string) error {
 	}
 
 	// sql执行
-	_, err = stmt.Exec(password)
+	_, err = stmt.Exec(hp)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
 		}).Info("Update admin password to database failed")
+
+		return err
+	}
+
+	return nil
+}
+
+// UpdateAdminInfo 更改管理员信息
+func UpdateAdminInfo(adminID, adminName, image string) error {
+	// sql预处理
+	stmt, err := DB.Prepare(qUpdateAdminInfo)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql prepare update admin information failed")
+
+		return err
+	}
+
+	// sql执行
+	_, err = stmt.Exec(adminID, adminName, image)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Update admin information to database failed")
 
 		return err
 	}
