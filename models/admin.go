@@ -20,7 +20,8 @@ const (
 	qAdminByID       = "SELECT id, admin_id, password, admin_name, image, last_login_at, ip FROM admin WHERE id=?"
 	// qAdminByID = "SELECT id, admin_id, password, admin_name, email, image FROM admin WHERE id = ?"
 	// qAll = "SELECT * FROM admin"
-	qUpdateLastLoginAt = "UPDATE admin SET last_login_at = ?, ip = ? WHERE id = 1"
+	qUpdateLastLoginAt   = "UPDATE admin SET last_login_at = ?, ip = ? WHERE id = 1"
+	qUpdateAdminPassword = "UPDATE admin SET password = ? WHERE id = 1"
 )
 
 // LoginAdminForm 后台登录账号密码表单结构
@@ -108,6 +109,30 @@ func UpdateTimeIP(lastLoginAt string, ip string) error {
 			"last_login_at": lastLoginAt,
 			"ip":            ip,
 		}).Info("Insert admin last login time and ip to database failed")
+
+		return err
+	}
+
+	return nil
+}
+
+// UpdateAdminPassword 数据库更改管理员密码
+func UpdateAdminPassword(password string) error {
+	stmt, err := DB.Prepare(qUpdateAdminPassword)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql prepare update admin password failed")
+
+		return err
+	}
+
+	// sql执行
+	_, err = stmt.Exec(password)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Update admin password to database failed")
 
 		return err
 	}

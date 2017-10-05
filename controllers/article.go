@@ -300,6 +300,7 @@ func AddArticleHandler(c *gin.Context) {
 	for count := 0; count < 3; count++ {
 		articles, err = models.GetAllArticle()
 		if err == nil && len(*articles) != 0 {
+
 			break
 		}
 
@@ -312,10 +313,16 @@ func AddArticleHandler(c *gin.Context) {
 		ma, _ := json.Marshal(value)
 
 		// 向链表头push，因为都是倒序查找
-		_ = models.RedisClient.LPush("articles", ma)
+		for count := 0; count < 10; count++ {
+			err = models.RedisClient.LPush("articles", ma).Err()
+			if err == nil {
+				log.WithFields(log.Fields{}).Info("Sync article to redis success")
+
+				break
+			}
+		}
 	}
 
-	log.WithFields(log.Fields{}).Info("Sync article to redis success")
 }
 
 // 根据 category id返回相应的分类
@@ -380,7 +387,7 @@ func getArticlesFromRedis(limit int64, page int64) (*[]ArticleRes, error) {
 	}
 
 	qstart = limit * (page - 1)
-	qend = limit * page
+	qend = limit*page - 1
 
 	log.Info(al)
 	log.Info(qstart)
