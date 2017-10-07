@@ -49,6 +49,16 @@ CREATE TABLE IF NOT EXISTS `tags` (
   primary key (id)        
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+# 如果表 visitor_count 不存在就奖励一个叫 visit_count 的表
+CREATE TABLE IF NOT EXISTS `visitor_count` (
+  `id`              INT(11) UNSIGNED    NOT NULL AUTO_INCREMENT,
+  `count`           INT(11) UNSIGNED        NOT NULL DEFAULT 0,
+  -- `article_id`      INT(11) UNSIGNED    NOT NULL DEFAULT 0,
+  primary key (id)        
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
 
 # INSERT INTO `admin` SET admin_id='admin', password='$2a$10$uIBcwGWH.hwsilRGd34HHOTOmzbiWUD4buHziGK59TDxJNXSv26cW', admin_name='admin';
 

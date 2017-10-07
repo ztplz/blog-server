@@ -24,6 +24,9 @@ func InitialRouter() {
 
 	r.Use(middlewares.CORSMiddleware())
 
+	// 统计访问人数
+	r.Use(middlewares.CountVisitorMiddleware())
+
 	// 管理员权限
 	admin := r.Group("/api/v1/admin")
 	{
