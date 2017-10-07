@@ -15,9 +15,15 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/ztplz/blog-server/models"
 	"github.com/ztplz/blog-server/router"
+	"github.com/ztplz/blog-server/middlewares"
+	"gopkg.in/robfig/cron.v2"
 )
 
 func main() {
+	// 定时器设置
+	c := cron.New()
+	c.AddFunc("0 0 0 * * *", middlewares.ClearIPPool)
+	c.Start()
 	// 日志设置
 	// log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(os.Stdout)
@@ -35,5 +41,8 @@ func main() {
 
 	// 初始化路由
 	router.InitialRouter()
+
+	// 定时任务
+	// select{}
 	
 }
