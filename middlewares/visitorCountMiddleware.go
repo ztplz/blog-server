@@ -55,7 +55,7 @@ func CountVisitorMiddleware() gin.HandlerFunc {
 }
 
 //AddTodayVisitorCount 添加昨日访问人数到数据库
-func AddTodayVisitorCount() {
+func AddYesterdayVisitorCount() {
 	var isAddToDatabaseSuccess bool
 
 	// 清楚 redis 里历史访问人数

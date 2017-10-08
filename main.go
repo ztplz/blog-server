@@ -22,7 +22,7 @@ import (
 func main() {
 	// 定时器设置
 	c := cron.New()
-	c.AddFunc("0 0 0 * * *", middlewares.AddTodayVisitorCount)
+	c.AddFunc("0 0 0 * * *", middlewares.AddYesterdayVisitorCount)
 	c.Start()
 	// 日志设置
 	// log.SetFormatter(&log.JSONFormatter{})
