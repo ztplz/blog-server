@@ -40,7 +40,7 @@ func CountVisitorMiddleware() gin.HandlerFunc {
 		if !isRepeat {
 			IPPool = append(IPPool, ip)
 		}
-
+    
 		// 今日 IP 池数量
 		// ipCount := len(IPPool)
 

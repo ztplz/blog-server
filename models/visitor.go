@@ -2,7 +2,7 @@ package models
 
 import (
 	"time"
-
+  
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,8 +32,6 @@ func CountVistor(count uint) error {
 
 	return err
 }
-
-//
 
 // GetAllVisitorCount 获取数据所有访客人数
 func GetAllVisitorCount() (uint, error) {
