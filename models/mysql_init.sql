@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS `tags` (
 # 如果表 visitor_count 不存在就奖励一个叫 visit_count 的表
 CREATE TABLE IF NOT EXISTS `visitor_count` (
   `id`              INT(11) UNSIGNED    NOT NULL AUTO_INCREMENT,
+  `date`            varchar(255)        NOT NULL DEFAULT '',
   `count`           INT(11) UNSIGNED        NOT NULL DEFAULT 0,
   -- `article_id`      INT(11) UNSIGNED    NOT NULL DEFAULT 0,
   primary key (id)        

@@ -1,16 +1,18 @@
 package models
 
 import (
+	"time"
+  
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	qUpdateVisitorCount = "UPDATE visitor_count SET count = count + 1 WHERE id = 1"
+	qUpdateVisitorCount = "INSERT INTO visitor_count (date, count) VALUES (?, ?)"
 	qGetAllVisitCount   = "SELECT count FROM visitor_count WHERE id =1"
 )
 
-// CountVistor 数据库访问人数加 1
-func CountVistor() error {
+// CountVistor 数据库按日期记录访问人数加
+func CountVistor(count uint) error {
 	// sql语句预处理
 	stmt, err := DB.Prepare(qUpdateVisitorCount)
 	if err != nil {
@@ -20,11 +22,12 @@ func CountVistor() error {
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec()
+	date := time.Now().Format("2006-01-02")
+	_, err = stmt.Exec(date, count)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
-		}).Fatal("Increase visit count failed")
+		}).Fatal("Insert visit count failed")
 	}
 
 	return err
