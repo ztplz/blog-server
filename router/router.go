@@ -79,6 +79,22 @@ func InitialRouter() {
 		tag.POST("", controllers.AddTagHandler)
 	}
 
+	// 用户操作
+	user := r.Group(".api/v1/user")
+	{
+		// 获取所有用户信息
+		user.GET("", controllers.GetAllUser)
+
+		// 用户注册
+		user.POST("", controllers.RegisterUser)
+	}
+
+	// 访客操作
+	visitor := r.Group("api/v1/visitor")
+	{
+		visitor.GET("/count", controllers.GetVisitCount)
+	}
+
 	// 监听8080端口
 	r.Run(":8080")
 }

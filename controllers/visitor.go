@@ -12,7 +12,7 @@ import (
 
 // GetVisitCount 获取访问人数信息
 func GetVisitCount(c *gin.Context) {
-	count, err := models.RedisClient.Get("visitor_count").Result()
+	count, err := models.RedisClient.Get("all_visitor_count").Result()
 	// 从 redis 里读取失败
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -36,7 +36,7 @@ func GetVisitCount(c *gin.Context) {
 		}
 
 		// 如果从数据库读取成功就同步到 redis 里
-		err = models.RedisClient.Set("visitor_count", string(count), 0).Err()
+		err = models.RedisClient.Set("all_visitor_count", string(count), 0).Err()
 		if err != nil {
 			log.WithFields(log.Fields{
 				"message": err,

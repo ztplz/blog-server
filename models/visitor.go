@@ -8,7 +8,7 @@ import (
 
 const (
 	qUpdateVisitorCount = "INSERT INTO visitor_count (date, count) VALUES (?, ?)"
-	qGetAllVisitCount   = "SELECT count FROM visitor_count WHERE id =1"
+	qGetAllVisitCount   = "SELECT SUM(count) FROM visitor_count"
 )
 
 // CountVistor 数据库按日期记录访问人数加
