@@ -22,10 +22,10 @@ var IPPool []string
 func CountVisitorMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var isRepeat bool
-		var isAddSuccess bool
-		var visitorCount uint
-		var isGetAllCount bool
-		var isAddRedisSuccess bool
+		// var isAddSuccess bool
+		// var visitorCount uint
+		// var isGetAllCount bool
+		// var isAddRedisSuccess bool
 
 		ip := c.ClientIP()
 		for _, value := range IPPool {
@@ -41,55 +41,53 @@ func CountVisitorMiddleware() gin.HandlerFunc {
 			IPPool = append(IPPool, ip)
 		}
 
-		// 尝试五次插入数据库，知道成功为止
-		for i := 0; i < 5; i++ {
-			err := models.CountVistor()
-			if err == nil {
-				isAddSuccess = true
-				log.Info("Count visitor success")
+		// 今日 IP 池数量
+		// ipCount := len(IPPool)
 
-				break
-			}
-		}
-
-		if !isAddSuccess {
-			log.Info("Count visitor failed")
-		}
-
-		// 数据库更新访问人数成功，则同步到 redis, 用 for 循环保证更高的成功几率
-		if isAddSuccess {
-			for i := 0; i < 5; i++ {
-				count, err := models.GetAllVisitorCount()
-				if err == nil {
-					isGetAllCount = true
-					visitorCount = count
-				}
-			}
-
-			if !isGetAllCount {
-				return
-			}
-
-			// 把访问统计人数同步到 redis 里
-			for i := 0; i < 5; i++ {
-				err := models.RedisClient.Set("visitor_count", string(visitorCount), 0).Err()
-				if err == nil {
-					isAddRedisSuccess = true
-
-					break
-				}
-			}
-
-			// 如果同步到 redis 失败，打印日志
-			if !isAddRedisSuccess {
-				log.Info("Sync visitor count to redis success")
-			}
-		}
+		// 每日访问人数同步到redis里
+		// err := models.RedisClient.Set("today_visitor_count", ipCount, 0).Err()
+		// if err != nil {
+		// 	log.WithFields(log.Fields{
+		// 		"errorMsg": err,
+		// 	}).Info("Store today visitor count to redis failed")
+		// }
 	}
 }
 
-// ClearIPPool 清空 IP 池
-func ClearIPPool() {
+//AddTodayVisitorCount 添加昨日访问人数到数据库
+func AddTodayVisitorCount() {
+	var isAddToDatabaseSuccess bool
+
+	// 清楚 redis 里历史访问人数
+	err := models.RedisClient.Del("all_visitor_count").Err()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Delete all visitor count from redis failed")
+	}
+
+	count := uint(len(IPPool))
+	// 历史访问人数比较重要，最多尝试五次确保成功
+	for i := 0; i < 5; i++ {
+		err := models.CountVistor(count)
+		if err == nil {
+			isAddToDatabaseSuccess = true
+
+			break
+		}
+	}
+
+	// 数据库存储失败
+	if !isAddToDatabaseSuccess {
+		log.Info("Insert yestday visitor count to database failed")
+	}
+
+	// 清空 IP 池
+	clearIPPool()
+}
+
+//  清空 IP 池
+func clearIPPool() {
 	IPPool = IPPool[:0]
 	log.Info("clear success")
 }
