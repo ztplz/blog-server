@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/ztplz/blog-server/middlewares"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -44,6 +45,8 @@ func GetVisitCount(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOk,
-		"message":    http.StatusText(http.StatusInternalServerError),
+		"message":    "获取访客数据成功",
+		"all_visitor_count": count,
+		"today_visitor_count": len(middlewares.IPPool)
 	})
 }
