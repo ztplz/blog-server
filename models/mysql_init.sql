@@ -58,6 +58,20 @@ CREATE TABLE IF NOT EXISTS `visitor_count` (
   primary key (id)        
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+# 如果表 user 不存在就建立一个叫 user 的表
+CREATE TABLE IF NOT EXISTS `user` (
+  `id`                  INT(11) UNSIGNED  NOT NULL AUTO_INCREMENT,
+  `user_id`             varchar(255)      NOT NULL DEFAULT '',
+  `password`            varchar(255)      NOT NULL DEFAULT '',
+  `user_name`           varchar(255)      NOT NULL DEFAULT '',
+  `image`               varchar(255)      NOT NULL DEFAULT '',
+  `create_at`           datetime          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_login_at`       datetime          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `login_count`         INT(11) UNSIGNED  NOT NULL 0,
+  `is_blacklist`        TINYINT(1)        NOT NULL DEFAULT 0,
+  primary key (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 
 
 
