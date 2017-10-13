@@ -58,6 +58,9 @@ func GetAllUser(c *gin.Context) {
 	}).Info("Get all user info success")
 }
 
+// GetUserByUserID 根据用户 ID 获取用户信息
+
+
 // RegisterUser 用户注册
 func RegisterUser(c *gin.Context) {
 	var userVals UserRegisterForm

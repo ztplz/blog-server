@@ -46,7 +46,8 @@ type AdminLoginForm struct {
 
 // AdminUpdatePasswordForm 更改密码表单
 type AdminUpdatePasswordForm struct {
-	Password string `form:"password" json:"password" binding:"required"`
+	OldPassword string `form:"old_password" json:"old_password" binding:"required"`
+	NewPassword string `form:"new_password" json:"new_password" binding:"required"`
 }
 
 // AdminUpdateInfoForm 更改管理员信息表单
@@ -343,7 +344,7 @@ func AdminUpdatePasswordhandler(c *gin.Context) {
 	var adminUpdatePasswordVals AdminUpdatePasswordForm
 
 	// token 认证
-	_, err := middlewares.AdminAuthMiddleware(c)
+	admin, err := middlewares.AdminAuthMiddleware(c)
 	if err != nil {
 		return
 	}
@@ -353,7 +354,7 @@ func AdminUpdatePasswordhandler(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"statusCode": http.StatusBadRequest,
-			"message":    "Miss password",
+			"message":    "请填写新旧密码",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
@@ -365,11 +366,12 @@ func AdminUpdatePasswordhandler(c *gin.Context) {
 	}
 
 	// 检查密码是否规定
-	password, err := checkString(adminUpdatePasswordVals.Password)
-	if err != nil {
+	oldPassword, oerr := checkString(adminUpdatePasswordVals.OldPassword)
+	newPassword, nerr := checkString(adminUpdatePasswordVals.NewPassword)
+	if oerr != nil || nerr != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"statusCode": http.StatusBadRequest,
-			"message":    "Incorrect password format",
+			"message":    "密码必须为数字字母组成",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
@@ -380,11 +382,12 @@ func AdminUpdatePasswordhandler(c *gin.Context) {
 		return
 	}
 
-	pb := checkAdminPasswordLength(password)
-	if !pb {
+	opb := checkAdminPasswordLength(oldPassword)
+	nbp := checkAdminPasswordLength(newPassword)
+	if !opb || !nbp {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"statusCode": http.StatusBadRequest,
-			"message":    "Incorrect password length",
+			"message":    "密码长度不正确",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
@@ -395,11 +398,43 @@ func AdminUpdatePasswordhandler(c *gin.Context) {
 		return
 	}
 
-	err = models.UpdateAdminPassword(password)
+	// 验证旧密码是否正确
+	err = bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(oldPassword))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "旧密码验证不正确",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Incorrect password",
+			"statusCode": http.StatusBadRequest,
+		}).Info("Admin change password failed")
+
+		return
+	}
+
+	// 更改成新密码
+	err = models.UpdateAdminPassword(newPassword)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"statusCode": http.StatusInternalServerError,
-			"message":    http.StatusText(http.StatusInternalServerError),
+			"message":    "密码修改失败",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Admin change password failed")
+
+		return
+	}
+
+	err = models.RedisClient.Set("admin_token", "", 0).Err()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "密码修改失败",
 		})
 		c.AbortWithStatus(http.StatusInternalServerError)
 		log.WithFields(log.Fields{
@@ -412,13 +447,12 @@ func AdminUpdatePasswordhandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"statusCode": http.StatusOK,
-		"message":    "success",
+		"message":    "密码修改成功",
 	})
 
 	log.WithFields(log.Fields{
 		"statusCode": http.StatusOK,
 	}).Info("Admin change password success")
-
 }
 
 // AdminUpdateInfoHandler 更改管理员信息

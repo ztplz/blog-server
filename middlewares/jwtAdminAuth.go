@@ -171,6 +171,7 @@ func parseToken(c *gin.Context) (*jwt.Token, error) {
 // 从请求头提取 token
 func jwtFromHeader(c *gin.Context, key string) (string, error) {
 	authHeader := c.Request.Header.Get(key)
+	log.Info(authHeader)
 
 	// 如果请求头 Authorization 部分为空
 	if authHeader == "" {

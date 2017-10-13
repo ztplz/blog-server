@@ -120,7 +120,7 @@ func UpdateTimeIP(lastLoginAt string, ip string) error {
 // UpdateAdminPassword 数据库更改管理员密码
 func UpdateAdminPassword(password string) error {
 	// 加密密码
-	hp, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+	hp, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,

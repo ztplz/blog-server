@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -56,8 +57,24 @@ func AddCategoryHandler(c *gin.Context) {
 		return
 	}
 
+	// 检查是否符合规定字数
+	category, err := checkCategory(categoryVals.Category)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "分类名不符合规范",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Add category failed")
+
+		return
+	}
+
 	// 检查是否有重复分类
-	b, err := checkRepeatCategory("categories", categoryVals.Category)
+	b, err := checkRepeatCategory("categories", category)
 	if err != nil {
 		// 直接返回错误码500
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -82,7 +99,7 @@ func AddCategoryHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
 			"errorMsg":   "Category already exist",
-			"category":   categoryVals.Category,
+			"category":   category,
 			"statusCode": http.StatusBadRequest,
 		}).Info("Add category failed")
 
@@ -90,7 +107,7 @@ func AddCategoryHandler(c *gin.Context) {
 	}
 
 	// 向数据库添加分类名
-	lastID, err := models.AddCategory(categoryVals.Category)
+	lastID, err := models.AddCategory(category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"statusCode": http.StatusInternalServerError,
@@ -114,20 +131,20 @@ func AddCategoryHandler(c *gin.Context) {
 	log.WithFields(log.Fields{
 		"message":    "Add category success",
 		"lastID":     lastID,
-		"category":   categoryVals.Category,
+		"category":   category,
 		"statusCode": http.StatusOK,
 	}).Info("Add category success")
 
 	// 把数据更新到 redis
-	category, err := json.Marshal(models.Category{ID: uint(lastID), Category: categoryVals.Category})
+	mcategory, err := json.Marshal(models.Category{ID: uint(lastID), Category: category})
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
-			"category": categoryVals,
+			"category": category,
 		}).Info("Marshal category failed")
 	}
 
-	err = models.RedisClient.HSet("categories", string(lastID), category).Err()
+	err = models.RedisClient.HSet("categories", string(lastID), mcategory).Err()
 	if err != nil {
 		log.WithFields(log.Fields{
 			"id":       lastID,
@@ -249,68 +266,37 @@ func GetAllCategoryHandler(c *gin.Context) {
 	}).Info("Get all categories from redis success")
 }
 
-// DeleteCategoryHandler 删除某个分类名
-func DeleteCategoryHandler(c *gin.Context) {
-	var categoryVals CategoryForm
-
-	_, err := middlewares.AdminAuthMiddleware(c)
-
-	if err != nil {
-		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
-		c.JSON(401, gin.H{
-			"message": err.Error(),
-		})
-		c.AbortWithError(401, errors.New("auth failed"))
-
-		return
-	}
-
-	err = c.ShouldBindWith(&categoryVals, binding.JSON)
-	if err != nil {
-		log.Println(err)
-		c.JSON(400, gin.H{
-			"message": "Miss category field",
-		})
-		c.AbortWithError(400, errors.New("Miss category field"))
-
-		return
-	}
-
-	err = models.DeleteCategory(categoryVals.Category)
-	if err != nil {
-		c.JSON(500, gin.H{
-			"message": "failed",
-		})
-		c.AbortWithError(400, errors.New("failed"))
-
-		return
-	}
-
-	c.JSON(200, gin.H{
-		"message": "success",
-	})
-}
-
-// 修改某个分类名
+// UpdateCategoryHandler 修改某个分类名
 func UpdateCategoryHandler(c *gin.Context) {
 	_, err := middlewares.AdminAuthMiddleware(c)
 
 	if err != nil {
-		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
-		c.JSON(401, gin.H{
-			"message": err.Error(),
-		})
-		c.AbortWithError(401, errors.New("auth failed"))
-
 		return
 	}
 
 	// 要修改的分类名
-	category := c.Query("name")
+	category := c.Param("category")
 	// 替换原来的分类名
 	key := c.Query("category")
 
-	err = models.UpdateCategory(category, key)
+	//检查分类名是否符合规范
+	newCategory, err := checkCategory(key)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "分类名不符合规范",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Add category failed")
+
+		return
+	}
+
+	// 数据库更新分类名
+	err = models.UpdateCategory(category, newCategory)
 	if err != nil {
 		log.Println(err)
 		c.JSON(500, gin.H{
@@ -324,6 +310,11 @@ func UpdateCategoryHandler(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "update success",
 	})
+}
+
+// 查询各个分类名文章详情
+func GetArticleByCategory(c *gin.Context) {
+
 }
 
 // 就检查是否重复提交已存在分类名
@@ -360,4 +351,16 @@ func checkRepeatCategory(key string, field string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+//
+func checkCategory(category string) (string, error) {
+	// 两边除去换行符和空格
+	s := strings.TrimSpace(category)
+
+	if len(s) == 0 || len(s) > models.CategoryLengthMax {
+		return "", errors.New("分类名不符合规范")
+	}
+
+	return s, nil
 }

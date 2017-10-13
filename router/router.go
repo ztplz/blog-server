@@ -68,7 +68,7 @@ func InitialRouter() {
 		// 增加分类名
 		category.POST("", controllers.AddCategoryHandler)
 
-		category.DELETE("", controllers.DeleteCategoryHandler)
+		// category.DELETE("", controllers.DeleteCategoryHandler)
 		category.PUT("/:name", controllers.UpdateCategoryHandler)
 	}
 
@@ -84,6 +84,9 @@ func InitialRouter() {
 	{
 		// 获取所有用户信息
 		user.GET("", controllers.GetAllUser)
+
+		// 获取某个用户的信息
+		// user.GET("/:userID", controllers.GetUserByUserID)
 
 		// 用户注册
 		user.POST("", controllers.RegisterUser)
