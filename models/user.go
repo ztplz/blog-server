@@ -89,7 +89,7 @@ func GetAllUser() (*[]User, error) {
 
 // UserRegister 用户信息存储进数据库
 func UserRegister(user *User) error {
-	// 加密初始管理员密码
+	// 加密密码
 	hp, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.WithFields(log.Fields{

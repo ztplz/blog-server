@@ -16,7 +16,9 @@ package controllers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -29,6 +31,17 @@ import (
 type TagForm struct {
 	Color    string `form:"color" json:"color" binding:"required"`
 	TagTitle string `form:"tag_title" json:"tag_title" binding:"required"`
+}
+
+// ColorList  颜色数组
+var ColorList = [8]string{
+	"pink",
+	"red",
+	"orange",
+	"green",
+	"cyan",
+	"blue",
+	"purple",
 }
 
 // GetAllTagHandler 获取全部标签
@@ -150,8 +163,40 @@ func AddTagHandler(c *gin.Context) {
 		return
 	}
 
+	// 检测标签颜色是否符合规范
+	bcolor := checkTagColor(tagVals.Color)
+	if !bcolor {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "颜色不符合要求",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Add tag failed")
+
+		return
+	}
+
+	// 检测标签名是否符合规范
+	tagTitle, err := checkTagTitle(tagVals.TagTitle)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "标签名不符合要求",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Add tag failed")
+
+		return
+	}
+
 	// 检查是否有重复分类
-	b, err := checkRepeatTag("tags", tagVals.TagTitle)
+	b, err := checkRepeatTag("tags", tagTitle)
 	if err != nil {
 		// 直接返回错误码500
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -176,7 +221,7 @@ func AddTagHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
 			"errorMsg":   "Tag already exist",
-			"category":   tagVals.TagTitle,
+			"category":   tagTitle,
 			"statusCode": http.StatusBadRequest,
 		}).Info("Add tag failed")
 
@@ -266,4 +311,27 @@ func checkRepeatTag(key string, field string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// 检查颜色是否符合要求,暂时只定8个颜色
+func checkTagColor(color string) bool {
+	for _, value := range ColorList {
+		if color == value {
+			return true
+		}
+	}
+
+	return false
+}
+
+// 检查标签名是否符合要求
+func checkTagTitle(tagTitle string) (string, error) {
+	// 两边除去换行符和空格
+	s := strings.TrimSpace(tagTitle)
+
+	if len(s) == 0 || len(s) > models.CategoryLengthMax {
+		return "", errors.New("标签名不符合规范")
+	}
+
+	return s, nil
 }

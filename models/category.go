@@ -12,6 +12,11 @@ type Category struct {
 	Category string `db:"category" json:"category"`
 }
 
+//设置分类名长度范围
+const (
+	CategoryLengthMax = 20
+)
+
 const (
 	qAddCategory    = "INSERT INTO category_list (category) VALUES (?)"
 	qGetAllCategory = "SELECT id, category FROM category_list"
@@ -111,23 +116,21 @@ func DeleteCategory(category string) error {
 	return nil
 }
 
-// 修改某个分类名
+// UpdateCategory 修改某个分类名
 func UpdateCategory(category string, key string) error {
 	stmt, err := DB.Prepare(qUpdateCategory)
 	defer stmt.Close()
 	if err != nil {
-		log.Println(err)
 		return err
 	}
 
 	res, err := stmt.Exec(key, category)
 	if err != nil {
-		log.Println(err)
 		return err
 	}
+
 	rows, err := res.RowsAffected()
 	if err != nil {
-		log.Println(err)
 		return err
 	}
 

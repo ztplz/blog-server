@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   `image`               varchar(255)      NOT NULL DEFAULT '',
   `create_at`           datetime          NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_login_at`       datetime          NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `login_count`         INT(11) UNSIGNED  NOT NULL 0,
+  `login_count`         INT(11) UNSIGNED  NOT NULL,
   `is_blacklist`        TINYINT(1)        NOT NULL DEFAULT 0,
   primary key (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
