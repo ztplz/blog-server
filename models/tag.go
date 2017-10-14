@@ -16,6 +16,8 @@ type Tag struct {
 const (
 	qGetAllTag = "SELECT id, color, tag_title FROM tags"
 	qAddTag    = "INSERT INTO tags (color, tag_title) VALUES (?, ?)"
+	qSelectTag = "SELECT id FROM tags WHERE tag_title = ?"
+	qUpdateTag = "UPDATE tag SET color = ?, tag_title = ? WHERE id = ?"
 )
 
 // GetAllTag 获取全部标签
@@ -99,4 +101,42 @@ func AddTag(color string, title string) (int64, error) {
 	return lastID, nil
 }
 
-// 修改标签
+// UpdateTag 修改某个标签
+func UpdateTag(id uint, color string, tagTitle string) error {
+	stmt, err := DB.Prepare(qUpdateTag)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql prepare failed")
+
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(color, tagTitle, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CheckTagTitle 查询某个标签名是否存在,存在或错误返回true，不存在返回false
+func CheckTagTitle(tagTitle string) bool {
+	stmt, err := DB.Prepare(qSelectTag)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql prepare failed")
+
+		return true
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(tagTitle)
+	if err != nil {
+		return true
+	}
+
+	return false
+}

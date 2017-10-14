@@ -75,8 +75,14 @@ func InitialRouter() {
 	// 标签操作
 	tag := r.Group("/api/v1/tags")
 	{
+		// 获取所有标签
 		tag.GET("", controllers.GetAllTagHandler)
+
+		// 增加标签
 		tag.POST("", controllers.AddTagHandler)
+
+		// 修改某个标签
+		tag.PUT("/:id", controllers.UpdateTagHandler)
 	}
 
 	// 用户操作

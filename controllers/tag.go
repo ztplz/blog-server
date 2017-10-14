@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -50,7 +51,7 @@ func GetAllTagHandler(c *gin.Context) {
 	tags, err := models.RedisClient.HVals("tags").Result()
 
 	// 如果从 redis 里读取失败或者不存在就从数据库里读取
-	if err != nil {
+	if err != nil || len(tags) == 0 {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
 		}).Info("Get all tags from redis failed")
@@ -274,6 +275,128 @@ func AddTagHandler(c *gin.Context) {
 		"id":       lastID,
 		"tagColor": tagVals.Color,
 		"tagTitle": tagVals.TagTitle,
+	}).Info("Sync tag to redis success")
+}
+
+// UpdateTagHandler 修改标签
+func UpdateTagHandler(c *gin.Context) {
+	// 管理员鉴权
+	_, err := middlewares.AdminAuthMiddleware(c)
+	if err != nil {
+		return
+	}
+
+	// 获取参数
+	id := c.Param("id")
+	color := c.Query("color")
+	title := c.Query("tag_title")
+
+	// 检查标签颜色是否符合规范
+	bcolor := checkTagColor(color)
+	if !bcolor {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "颜色不符合要求",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "颜色不符合要求",
+			"statusCode": http.StatusBadRequest,
+		}).Info("Update tag failed")
+
+		return
+	}
+
+	// 检查标签名是否符合规范
+	tagTitle, err := checkTagTitle(title)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "标签名不符合要求",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("Update tag failed")
+
+		return
+	}
+
+	// 检查标签名是否重名
+	b := models.CheckTagTitle(tagTitle)
+	if b {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "标签名重复",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "标签名重复",
+			"statusCode": http.StatusBadRequest,
+		}).Info("Update tag failed")
+
+		return
+	}
+
+	// 把id转化成 uint类型
+	uid, err := strconv.ParseUint(id, 10, 8)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "标签修改失败",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Update tag failed")
+
+		return
+	}
+
+	// 数据库更新tag
+	err = models.UpdateTag(uint(uid), color, tagTitle)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "标签修改失败",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Update tag failed")
+
+		return
+	}
+
+	c.JSON(http.StatusBadRequest, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "标签名修改成功",
+	})
+
+	// 同步更新到 redis 里
+	tag, err := json.Marshal(models.Tag{ID: uint(uid), Color: color, TagTitle: tagTitle})
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Add tag to redis failed")
+	}
+
+	err = models.RedisClient.HSet("tags", id, tag).Err()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"id":       id,
+			"color":    color,
+			"tagTitle": tagTitle,
+		}).Info("Store tag to redis failed")
+	}
+
+	log.WithFields(log.Fields{
+		"id":       id,
+		"color":    color,
+		"tagTitle": tagTitle,
 	}).Info("Sync tag to redis success")
 }
 
