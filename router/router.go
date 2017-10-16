@@ -55,6 +55,9 @@ func InitialRouter() {
 		//获取所有文章列表， limit(每次返回列表数) page(页数)
 		article.GET("", controllers.GetAllArticlesHandler)
 
+		// 根据 id 获取博文
+		article.GET("/:id", controllers.GetArticleByID)
+
 		// 增加博文
 		article.POST("", controllers.AddArticleHandler)
 	}
@@ -86,7 +89,7 @@ func InitialRouter() {
 	}
 
 	// 用户操作
-	user := r.Group(".api/v1/user")
+	user := r.Group("api/v1/user")
 	{
 		// 获取所有用户信息
 		user.GET("", controllers.GetAllUser)

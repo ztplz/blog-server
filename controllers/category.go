@@ -162,11 +162,14 @@ func AddCategoryHandler(c *gin.Context) {
 
 // GetAllCategoryHandler 获取全部分类名或者分类名包含的博文
 func GetAllCategoryHandler(c *gin.Context) {
+	// 检查是否有相应的参数
+	// ab := c.Query("article_count")
+
 	// 从redis 里获取所有 category 的值
 	categories, err := models.RedisClient.HVals("categories").Result()
 
 	// 如果从 redis 查询失败或者不存在 就从数据库读取全部分类名返回给用户, 并同步缺失的数据到 redis 里
-	if err != nil {
+	if err != nil || len(categories) == 0 {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
 		}).Info("Get all categories from redis failed")
@@ -298,11 +301,14 @@ func UpdateCategoryHandler(c *gin.Context) {
 	// 数据库更新分类名
 	err = models.UpdateCategory(category, newCategory)
 	if err != nil {
-		log.Println(err)
-		c.JSON(500, gin.H{
-			"message": "failed",
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "数据更新失败",
 		})
-		c.AbortWithError(401, errors.New("update failed"))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Update category failed")
 
 		return
 	}
@@ -310,6 +316,15 @@ func UpdateCategoryHandler(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "update success",
 	})
+
+	//同步到redis里
+	// err = models.RedisClient.HSet("categories")
+	// if err != nil {
+	// 	log.WithFields(log.Fields{
+	// 		"errorMsg": err,
+	// 	}).Info("Delete categories from redis failed")
+	// }
+
 }
 
 // 查询各个分类名文章详情
@@ -353,7 +368,7 @@ func checkRepeatCategory(key string, field string) (bool, error) {
 	return false, nil
 }
 
-//
+// 检查分类名是否符合规范
 func checkCategory(category string) (string, error) {
 	// 两边除去换行符和空格
 	s := strings.TrimSpace(category)

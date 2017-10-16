@@ -176,3 +176,16 @@ func UpdateAdminInfo(adminID, adminName, image string) error {
 
 	return nil
 }
+
+// MarshalJSON 序列化
+// func (a *Admin) MarshalJSON() ([]byte, error) {
+// 	type admin Admin
+
+// 	return json.Marshal(&struct {
+// 		*admin
+// 		LastLoginAt string `json:"last_login_at"`
+// 	}{
+// 		Admin:       (*admin)(a),
+// 		LastLoginAt: a.LastLoginAt.Format("2006-01-02T15:04:05.000Z"),
+// 	})
+// }
