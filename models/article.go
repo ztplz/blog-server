@@ -9,7 +9,7 @@ const (
 	ArticleTitleLengthMax = 100
 
 	// ArticlePreviewTextLengthMax 文章预览最多字符数
-	ArticlePreviewTextLengthMax = 300
+	ArticlePreviewTextLengthMax = 600
 
 	qGetArticleCount  = "SELECT COUNT(*) as count FROM article"
 	qGetAllArticle    = "SELECT * FROM article"
@@ -17,12 +17,13 @@ const (
 	qGetArticleByPage = `SELECT id, create_at, update_at, visit_count, reply_count, article_title, article_previewtext, article_content, top, category, tag_list 
 						FROM article 
 							ORDER BY id DESC LIMIT ?, ?`
+	qGetArticleByID = "SELECT id, create_at, update_at, visit_count, reply_count, article_title, article_previewtext, article_content, top, category, tag_list FROM article WHERE id = ?"
 )
 
 // Article 文章的数据结构
 type Article struct {
 	ID                 uint   `db:"id" json:"id"`
-	CreateAt           string `db:"create_at" json:"creat_at"`
+	CreateAt           string `db:"create_at" json:"create_at"`
 	UpdateAt           string `db:"update_at" json:"update_at"`
 	VisitCount         uint   `db:"visit_count" json:"visit_count"`
 	ReplyCount         uint   `db:"reply._count" json:"reply_count"`
@@ -67,6 +68,23 @@ func AddArticle(article *Article) (int64, error) {
 	}
 
 	return lastID, nil
+}
+
+// GetArticleByID 根据 id 查询
+func GetArticleByID(id uint64) (*Article, error) {
+	var article Article
+
+	row := DB.QueryRow(qGetArticleByID, uint(id))
+	err := row.Scan(&article.ID, &article.CreateAt, &article.UpdateAt, &article.VisitCount, &article.ReplyCount, &article.ArticleTitle, &article.ArticlePreviewText, &article.ArticleContent, &article.Top, &article.Category, &article.TagList)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql query failed")
+
+		return nil, err
+	}
+
+	return &article, nil
 }
 
 // GetArticleByPage 分页查询

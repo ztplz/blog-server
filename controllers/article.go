@@ -27,7 +27,7 @@ type ArticleForm struct {
 // ArticleRes 定义博文响应的结构体
 type ArticleRes struct {
 	ID                 uint            `json:"id"`
-	CreateAt           string          `json:"creat_at"`
+	CreateAt           string          `json:"create_at"`
 	UpdateAt           string          `json:"update_at"`
 	VisitCount         uint            `json:"visit_count"`
 	ReplyCount         uint            `json:"reply_count"`
@@ -176,6 +176,63 @@ func GetAllArticlesHandler(c *gin.Context) {
 		"pageString": page,
 		"statusCode": http.StatusInternalServerError,
 	}).Info("Get articles  success")
+}
+
+// GetArticleByID 根据id获取博文
+func GetArticleByID(c *gin.Context) {
+	id := c.Param("id")
+
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "请输入博文id",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"statusCode": http.StatusBadRequest,
+			"message":    "未输入博文id",
+		}).Info("Get article failed")
+
+		return
+	}
+
+	// 把id转换成 uint 类型
+	uid, err := strconv.ParseUint(id, 10, 8)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "请求处理失败",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"statusCode": http.StatusInternalServerError,
+			"message":    err,
+		}).Info("Get article failed")
+
+		return
+	}
+
+	// 从数据库根据 id 查询博文
+	article, err := models.GetArticleByID(uid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "请求处理失败",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"statusCode": http.StatusInternalServerError,
+			"message":    err,
+		}).Info("Get article failed")
+
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "success",
+		"article":    *article,
+	})
 }
 
 // AddArticleHandler 增加文章
@@ -549,3 +606,5 @@ func getArticlesFromDatabase(limit int64, page int64) (*[]ArticleRes, error) {
 
 	return &articlesRes, nil
 }
+
+//
