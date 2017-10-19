@@ -95,16 +95,31 @@ func InitialRouter() {
 		user.GET("", controllers.GetAllUser)
 
 		// 获取某个用户的信息
-		// user.GET("/:userID", controllers.GetUserByUserID)
+		user.GET("/:userID", controllers.GetUserByUserID)
 
 		// 用户注册
 		user.POST("", controllers.RegisterUser)
+
+		// 用户修改 用户ID
+		user.PUT("/:userID/userID", controllers.UpdateUserID)
+
+		// 用户修改用户名字
+		user.PUT("/:userID/userName", controllers.UpdateUserName)
+
+		// 用户修改密码
+		user.PUT("/:userID/password", controllers.UpdateUserPassword)
 	}
 
 	// 访客操作
 	visitor := r.Group("api/v1/visitor")
 	{
 		visitor.GET("/count", controllers.GetVisitCount)
+	}
+
+	// 上传
+	upload := r.Group("api/v1/upload")
+	{
+		upload.GET("/accesskey", controllers.GetAccesskey)
 	}
 
 	// 监听8080端口
