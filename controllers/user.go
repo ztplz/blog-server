@@ -58,8 +58,51 @@ func GetAllUser(c *gin.Context) {
 	}).Info("Get all user info success")
 }
 
-// GetUserByUserID 根据用户 ID 获取用户信息
+// GetUserByUserID 根据 UserID 获取用户信息
+func GetUserByUserID(c *gin.Context) {
+	userID := c.Param("userID")
 
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "用户ID不能为空",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "用户ID为空",
+			"statusCode": http.StatusBadRequest,
+		}).Info("Get User failed")
+
+		return
+	}
+
+	// 鉴权
+	err := middlewares.UserAuthMiddleware(c, userID)
+	if err != nil {
+		return
+	}
+
+	user, err := models.GetUserByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "数据获取失败，请重试",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Get User failed")
+
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "数据获取成功",
+		"user":       *user,
+	})
+}
 
 // RegisterUser 用户注册
 func RegisterUser(c *gin.Context) {
@@ -83,16 +126,18 @@ func RegisterUser(c *gin.Context) {
 
 	// 除去两边空格
 	userID, ierr := checkUserString(userVals.UserID)
-	userName, nerr := checkUserString(userVals.UserName)
+	userName := strings.TrimSpace(userVals.UserName)
+	// userName, nerr := checkUserString(userVals.UserName)
 	password, perr := checkUserString(userVals.Password)
-	if ierr != nil || nerr != nil || perr != nil {
+	if ierr != nil || perr != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"statusCode": http.StatusBadRequest,
 			"message":    "请不要在提交的注册信息中包含空格",
 		})
 		c.AbortWithStatus(http.StatusBadRequest)
 		log.WithFields(log.Fields{
-			"errorMsg":   err,
+			"ierr":       ierr,
+			"perr":       perr,
 			"statusCode": http.StatusBadRequest,
 		}).Info("User register failed")
 
@@ -251,6 +296,153 @@ func RegisterUser(c *gin.Context) {
 		"userName":   userName,
 		"statusCode": http.StatusOK,
 	}).Info("User register success")
+}
+
+// UpdateUserID 修改用户ID
+func UpdateUserID(c *gin.Context) {
+	oldUserID := c.Param("userID")
+	newUserID := c.Query("new_userID")
+
+	if oldUserID == "" || newUserID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "用户ID不能为空",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "用户ID为空",
+			"statusCode": http.StatusBadRequest,
+		}).Info("User userID update failed")
+
+		return
+	}
+
+	// 鉴权
+	err := middlewares.UserAuthMiddleware(c, oldUserID)
+	if err != nil {
+		return
+	}
+
+	err = models.UpdateUserID(oldUserID, newUserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "更改失败，请重新尝试",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("User userID update failed")
+
+		return
+	}
+
+	// 更新redis里token key
+	token, _ := models.RedisClient.Get(oldUserID + "_token").Result()
+	_ = models.RedisClient.Set(newUserID+"_token", token, 6).Err()
+
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "更改成功",
+		"user_id":    newUserID,
+	})
+}
+
+// UpdateUserName 更改用户名
+func UpdateUserName(c *gin.Context) {
+	oldUserName := c.Query("old_userName")
+	newUserName := c.Query("new_userName")
+	userID := c.Param("userID")
+
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"statusCode": http.StatusUnauthorized,
+			"message":    "你没权权限操作",
+		})
+		c.AbortWithStatus(http.StatusUnauthorized)
+		log.WithFields(log.Fields{
+			"errorMsg":   "userID 为空",
+			"statusCode": http.StatusUnauthorized,
+		}).Info("User userName update failed")
+
+		return
+	}
+
+	if oldUserName == "" || newUserName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "用户名字不能为空",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "用户名字为空",
+			"statusCode": http.StatusBadRequest,
+		}).Info("User update failed")
+
+		return
+	}
+
+	// 鉴权
+	err := middlewares.UserAuthMiddleware(c, userID)
+	if err != nil {
+		return
+	}
+
+	err = models.UpdateUserName(oldUserName, newUserName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "更改失败，请重新尝试",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("User userName update failed")
+
+		return
+	}
+
+	// 更新redis里的token key
+	// token, _ := models.RedisClient.Get(userID + "_token").Result()
+	// _ = models.RedisClient.Set(newUserID+"_token", token, 6).Err()
+
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "更改成功",
+		"user_name":  newUserName,
+	})
+}
+
+// UpdateUserPassword 更新用户密码
+func UpdateUserPassword(c *gin.Context) {
+	userID := c.Param("userID")
+	password := c.Query("password")
+
+	err := models.UpdateUserPassword(userID, password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "更改失败，请重新尝试",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"userID":     userID,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("Update user password failed")
+
+		return
+	}
+
+	// 清除redis里原来的token
+	_ = models.RedisClient.Del(userID + "_token")
+
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "更改成功",
+	})
 }
 
 // 除去两边空格并检测输入里面是否有空格

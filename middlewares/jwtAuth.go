@@ -40,7 +40,7 @@ type AdminLogin struct {
 
 // AdminAuthMiddleware 后台token认证中间件
 func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
-	token, err := parseToken(c)
+	token, err := parseToken(c, "admin")
 
 	// 如果解析 token 发生错误
 	if err != nil {
@@ -112,6 +112,105 @@ func AdminAuthMiddleware(c *gin.Context) (*models.Admin, error) {
 	return admin, nil
 }
 
+// UserAuthMiddleware 后台token认证中间件
+func UserAuthMiddleware(c *gin.Context, userID string) error {
+	_, err := parseToken(c, userID)
+
+	// 如果解析 token 发生错误
+	if err != nil {
+		c.Header("WWW-Authenticate", "JWT realm=gin jwt")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"statusCode": http.StatusUnauthorized,
+			"message":    err.Error(),
+		})
+		c.AbortWithStatus(http.StatusUnauthorized)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusUnauthorized,
+		}).Info("Admin auth failed")
+
+		return err
+	}
+
+	// rtoken, err := models.RedisClient.Get(userID + "_token").Result()
+	// if err != nil {
+	// 	c.JSON(http.StatusUnauthorized, gin.H{
+	// 		"statusCode": http.StatusUnauthorized,
+	// 		"message":    "请重新登录",
+	// 	})
+	// 	c.AbortWithStatus(http.StatusUnauthorized)
+	// 	log.WithFields(log.Fields{
+	// 		"errorMsg":   err,
+	// 		"statusCode": http.StatusUnauthorized,
+	// 	}).Info("Admin auth failed")
+
+	// 	return err
+	// }
+
+	// if *token != rtoken {
+	// 	c.JSON(http.StatusUnauthorized, gin.H{
+	// 		"statusCode": http.StatusUnauthorized,
+	// 		"message":    "你没有权限查看",
+	// 	})
+	// 	c.AbortWithStatus(http.StatusUnauthorized)
+	// 	log.WithFields(log.Fields{
+	// 		"errorMsg":   err,
+	// 		"statusCode": http.StatusUnauthorized,
+	// 	}).Info("Admin auth failed")
+
+	// 	return err
+	// }
+
+	// claims := token.Claims.(jwt.MapClaims)
+
+	// id := claims["id"].(string)
+	// c.Set("JWT_PAYLOAD", claims)
+	// c.Set("id", id)
+
+	// // 从数据取出用户 ID
+	// user, err := models.AdminByID()
+	// if err != nil {
+	// 	c.Header("WWW-Authenticate", "JWT realm=gin jwt")
+	// 	c.JSON(http.StatusInternalServerError, gin.H{
+	// 		"statusCode": http.StatusInternalServerError,
+	// 		"message":    http.StatusText(http.StatusInternalServerError),
+	// 	})
+	// 	c.AbortWithStatus(http.StatusInternalServerError)
+	// 	log.WithFields(log.Fields{
+	// 		"errorMsg":   "user info query failed",
+	// 		"statusCode": http.StatusInternalServerError,
+	// 	}).Info("User auth failed")
+
+	// 	return nil, err
+	// }
+
+	// if id != user.UserID {
+	// 	c.Header("WWW-Authenticate", "JWT realm=gin jwt")
+	// 	c.JSON(http.StatusUnauthorized, gin.H{
+	// 		"statusCode": http.StatusUnauthorized,
+	// 		"message":    "You don't have permission to access",
+	// 	})
+	// 	c.AbortWithStatus(http.StatusUnauthorized)
+	// 	log.WithFields(log.Fields{
+	// 		"errorMsg":   "Id don't match adminID",
+	// 		"statusCode": http.StatusUnauthorized,
+	// 	}).Info("Admin auth failed")
+
+	// 	return nil, errors.New("Incorrect token")
+	// }
+
+	// redis延长6个小时 token 存储时间
+
+	// err = models.RedisClient.GetSet(userID+"_token", rtoken, time.Hour*6).Err()
+	// if err != nil {
+	// 	log.WithFields(log.Fields{
+	// 		"errorMsg": err,
+	// 	}).Info("Admin token store to redis failed")
+	// }
+
+	return nil
+}
+
 // ExtractClaims 提取 JWT claims
 func ExtractClaims(c *gin.Context) jwt.MapClaims {
 	_, exists := c.Get("JWT_PAYLOAD")
@@ -127,7 +226,7 @@ func ExtractClaims(c *gin.Context) jwt.MapClaims {
 }
 
 // 解析token
-func parseToken(c *gin.Context) (*jwt.Token, error) {
+func parseToken(c *gin.Context, key string) (*jwt.Token, error) {
 	var token string
 	var err error
 
@@ -138,7 +237,7 @@ func parseToken(c *gin.Context) (*jwt.Token, error) {
 	}
 
 	// 查询 redis 里是否有这个token
-	adminToken, err := models.RedisClient.Get("admin_token").Result()
+	rToken, err := models.RedisClient.Get(key + "_token").Result()
 	if err != nil {
 		log.WithFields(log.Fields{
 			"errorMsg": err,
@@ -148,12 +247,12 @@ func parseToken(c *gin.Context) (*jwt.Token, error) {
 	}
 
 	// 如果 redis 里token为空值
-	if adminToken == "" {
+	if rToken == "" {
 		return nil, errors.New("You don't login in or token expired")
 	}
 
 	// 比对token
-	if token != adminToken {
+	if token != rToken {
 		return nil, errors.New("Token is not match")
 	}
 

@@ -12,7 +12,7 @@ type User struct {
 	Password    string `db:"password" json:"password"`
 	UserName    string `db:"user_name" json:"user_name"`
 	Image       string `db:"image" json:"image"`
-	CreateAt    string `db:"create_at" json:"creat_at"`
+	CreateAt    string `db:"create_at" json:"create_at"`
 	LastLoginAt string `db:"last_login_at" json:"last_login_at"`
 	LoginCount  uint   `db:"login_count" json:"login_count"`
 	IsBlacklist bool   `db:"is_blacklist" json:"is_blacklist"`
@@ -44,6 +44,10 @@ const (
 						(user_id, user_name, password, image, create_at, last_login_at, login_count, is_blacklist)
 						VALUES
 						(?, ?, ?, ?, ?, ?, ?, ?)`
+	qGetUserByUserID    = "SELECT id, user_id, user_name, password, image, create_at, last_login_at, login_count, is_blacklist FROM user WHERE user_id = ?"
+	qUpdateUserID       = "UPDATE user SET user_id = ? WHERE user_id = ?"
+	qUpdateUserName     = "UPDATE user SET user_name = ? WHERE user_name = ?"
+	qUpdateUserPassword = "UPDATE user SET password = ? WHERE user_id = ?"
 )
 
 // GetAllUser 获取所有注册用户信息
@@ -85,6 +89,106 @@ func GetAllUser() (*[]User, error) {
 	}
 
 	return &users, nil
+}
+
+// GetUserByUserID 根据 UserID 从数据库获取数据
+func GetUserByUserID(userID string) (*User, error) {
+	var user User
+
+	row := DB.QueryRow(qGetUserByUserID, userID)
+	err := row.Scan(&user.ID, &user.UserID, &user.UserName, &user.Password, &user.Image, &user.CreateAt, &user.LastLoginAt, &user.LoginCount, &user.IsBlacklist)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+			"userID":   userID,
+		}).Info("Query user failed")
+
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// UpdateUserID 更改用户ID
+func UpdateUserID(oldUserID string, newUserID string) error {
+	stmt, err := DB.Prepare(qUpdateUserID)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql prepare failed")
+
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(newUserID, oldUserID)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql exec failed")
+
+		return err
+	}
+
+	return nil
+}
+
+// UpdateUserName 更改用户名字
+func UpdateUserName(oldUserName string, newUserName string) error {
+	stmt, err := DB.Prepare(qUpdateUserName)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql prepare failed")
+
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(newUserName, oldUserName)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql exec failed")
+
+		return err
+	}
+
+	return nil
+}
+
+// UpdateUserPassword 更新用户密码
+func UpdateUserPassword(userID string, password string) error {
+	// 加密密码
+	hp, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Encrypt user password failed")
+
+		return err
+	}
+
+	stmt, err := DB.Prepare(qUpdateUserPassword)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Sql prepare failed")
+
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(hp, userID)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+		}).Info("Update user password failed")
+
+		return err
+	}
+
+	return nil
 }
 
 // UserRegister 用户信息存储进数据库
