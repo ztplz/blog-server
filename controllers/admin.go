@@ -38,6 +38,16 @@ var Timeout = time.Hour * 24 * 7
 
 // var Timeout = time.Second * 3600
 
+type Admin struct {
+	ID          uint   `db:"id" json:"id"`
+	AdminID     string `db:"admin_id" json:"admin_id"`
+	Password    string `db:"password" json:"password"`
+	AdminName   string `db:"admin_name" json:"admin_name"`
+	Image       string `db:"image" json:"image"`
+	LastLoginAt string `db:"last_login_at" json:"last_login_at"`
+	IP          string `db:"ip" json:"ip"`
+}
+
 // AdminLoginForm 登录表单
 type AdminLoginForm struct {
 	AdminID  string `form:"admin_id" json:"admin_id" binding:"required"`
@@ -183,7 +193,7 @@ func AdminLoginHandler(c *gin.Context) {
 		return
 	}
 
-	// 密码不匹配
+	// 验证密码
 	err = bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(password))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{

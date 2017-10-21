@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"regexp"
@@ -13,12 +14,24 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/ztplz/blog-server/middlewares"
 	"github.com/ztplz/blog-server/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // UserRegisterForm 用户注册表单结构
 type UserRegisterForm struct {
 	UserID   string `form:"user_id" json:"user_id" binding:"required"`
 	UserName string `form:"user_name" json:"user_name" binding:"required"`
+	Password string `form:"password" json:"password" binding:"required"`
+}
+
+// UserLoginForm  用户登录表单结构
+type UserLoginForm struct {
+	UserID   string `form:"user_id" json:"user_id" binding:"required"`
+	Password string `form:"password" json:"password" binding:"required"`
+}
+
+// ChangePasswordForm 更改密码表单
+type ChangePasswordForm struct {
 	Password string `form:"password" json:"password" binding:"required"`
 }
 
@@ -417,10 +430,27 @@ func UpdateUserName(c *gin.Context) {
 
 // UpdateUserPassword 更新用户密码
 func UpdateUserPassword(c *gin.Context) {
-	userID := c.Param("userID")
-	password := c.Query("password")
+	var passwordVals ChangePasswordForm
 
-	err := models.UpdateUserPassword(userID, password)
+	userID := c.Param("userID")
+
+	// 判断是否有必须字段
+	err := c.ShouldBindWith(&passwordVals, binding.JSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"satusCode": http.StatusBadRequest,
+			"message":   "密码不能为空",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("User Update password failed")
+
+		return
+	}
+
+	err = models.UpdateUserPassword(userID, passwordVals.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"statusCode": http.StatusInternalServerError,
@@ -443,6 +473,131 @@ func UpdateUserPassword(c *gin.Context) {
 		"statusCode": http.StatusOK,
 		"message":    "更改成功",
 	})
+}
+
+// UserLoginHandler 用户登录
+func UserLoginHandler(c *gin.Context) {
+	var loginVals UserLoginForm
+
+	// 判断表单是否有必须字段
+	err := c.ShouldBindWith(&loginVals, binding.JSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"satusCode": http.StatusBadRequest,
+			"message":   "账号或密码不能为空",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusBadRequest,
+		}).Info("User  login failed")
+
+		return
+	}
+
+	// 从数据库查询密码
+	hashPassword, err := models.GetPasswordByUserID(loginVals.UserID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"satusCode": http.StatusBadRequest,
+				"message":   "该账号不存在",
+			})
+			c.AbortWithStatus(http.StatusBadRequest)
+			log.WithFields(log.Fields{
+				"errorMsg":   err,
+				"statusCode": http.StatusBadRequest,
+			}).Info("User login failed")
+
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"satusCode": http.StatusInternalServerError,
+			"message":   "请重试尝试",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   err,
+			"statusCode": http.StatusInternalServerError,
+		}).Info("User login failed")
+
+		return
+	}
+
+	// 验证密码
+	err = bcrypt.CompareHashAndPassword([]byte(hashPassword), []byte(loginVals.Password))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"statusCode": http.StatusBadRequest,
+			"message":    "密码不正确",
+		})
+		c.AbortWithStatus(http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Incorrect admin password",
+			"statusCode": http.StatusBadRequest,
+		}).Info("User login failed")
+
+		return
+	}
+
+	// 生成token
+	token := jwt.New(jwt.GetSigningMethod(SigningAlgorithm))
+	claims := token.Claims.(jwt.MapClaims)
+
+	// 设置token过期时间
+	expire := time.Now().Add(Timeout)
+	claims["id"] = loginVals.UserID
+	claims["exp"] = expire.Unix()
+	claims["orig_iat"] = time.Now().Unix()
+
+	// 生成token
+	tokenString, err := token.SignedString(secretKey)
+
+	// 生成token失败
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "请重新尝试",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Generate token failed",
+			"statusCode": http.StatusInternalServerError,
+		}).Info("User login failed")
+
+		return
+	}
+
+	// 把用户 token 放入 redis里, token不同步进数据库
+	err = models.RedisClient.Set(loginVals.UserID+"_token", tokenString, time.Hour*24).Err()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"statusCode": http.StatusInternalServerError,
+			"message":    "请重新尝试",
+		})
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.WithFields(log.Fields{
+			"errorMsg":   "Store token to redis failed",
+			"statusCode": http.StatusInternalServerError,
+		}).Info("User login failed")
+
+		return
+	}
+
+	// 生成token成功
+	c.JSON(http.StatusOK, gin.H{
+		"statusCode": http.StatusOK,
+		"message":    "登录成功",
+		"token":      tokenString,
+		"max_expire": expire.Format(time.RFC3339),
+	})
+
+	log.WithFields(log.Fields{
+		"message":    "login success",
+		"useID":      loginVals.UserID,
+		"statusCode": http.StatusOK,
+	}).Info("User login failed")
 }
 
 // 除去两边空格并检测输入里面是否有空格

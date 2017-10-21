@@ -44,10 +44,11 @@ const (
 						(user_id, user_name, password, image, create_at, last_login_at, login_count, is_blacklist)
 						VALUES
 						(?, ?, ?, ?, ?, ?, ?, ?)`
-	qGetUserByUserID    = "SELECT id, user_id, user_name, password, image, create_at, last_login_at, login_count, is_blacklist FROM user WHERE user_id = ?"
-	qUpdateUserID       = "UPDATE user SET user_id = ? WHERE user_id = ?"
-	qUpdateUserName     = "UPDATE user SET user_name = ? WHERE user_name = ?"
-	qUpdateUserPassword = "UPDATE user SET password = ? WHERE user_id = ?"
+	qGetUserByUserID     = "SELECT id, user_id, user_name, password, image, create_at, last_login_at, login_count, is_blacklist FROM user WHERE user_id = ?"
+	qUpdateUserID        = "UPDATE user SET user_id = ? WHERE user_id = ?"
+	qUpdateUserName      = "UPDATE user SET user_name = ? WHERE user_name = ?"
+	qUpdateUserPassword  = "UPDATE user SET password = ? WHERE user_id = ?"
+	qGetPasswordByUserID = "SELECT password FROM user WHERE user_id = ?"
 )
 
 // GetAllUser 获取所有注册用户信息
@@ -223,4 +224,22 @@ func UserRegister(user *User) error {
 	}
 
 	return nil
+}
+
+// GetPasswordByUserID 根据 userID 查询密码
+func GetPasswordByUserID(userID string) (string, error) {
+	var password string
+
+	row := DB.QueryRow(qGetPasswordByUserID, userID)
+	err := row.Scan(&password)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"errorMsg": err,
+			"userID":   userID,
+		}).Info("Query user failed")
+
+		return "", err
+	}
+
+	return password, nil
 }

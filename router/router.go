@@ -100,6 +100,9 @@ func InitialRouter() {
 		// 用户注册
 		user.POST("", controllers.RegisterUser)
 
+		// 用户登录
+		user.POST("/login", controllers.UserLoginHandler)
+
 		// 用户修改 用户ID
 		user.PUT("/:userID/userID", controllers.UpdateUserID)
 
